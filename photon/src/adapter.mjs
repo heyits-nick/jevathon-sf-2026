@@ -10,9 +10,13 @@ export function openState(path) {
     CREATE TABLE IF NOT EXISTS deliveries (
       provider_key TEXT PRIMARY KEY, scope TEXT NOT NULL, text TEXT NOT NULL,
       source_url TEXT, reply TEXT, sent INTEGER NOT NULL DEFAULT 0,
-      failure_notice_sent INTEGER NOT NULL DEFAULT 0
+      failure_notice_sent INTEGER NOT NULL DEFAULT 0,
+      recovery_attempts INTEGER NOT NULL DEFAULT 0
     );
   `);
+  if (!db.prepare('PRAGMA table_info(deliveries)').all().some(column => column.name === 'recovery_attempts')) {
+    db.exec('ALTER TABLE deliveries ADD COLUMN recovery_attempts INTEGER NOT NULL DEFAULT 0');
+  }
   return db;
 }
 
@@ -89,9 +93,11 @@ async function finishDelivery(db, delivery, backend, send) {
 }
 
 export async function recoverPending(db, backend, resolveSpace, limit = 100) {
-  const pending = db.prepare('SELECT * FROM deliveries WHERE sent = 0 ORDER BY rowid LIMIT ?').all(limit);
+  const pending = db.prepare('SELECT * FROM deliveries WHERE sent = 0 ORDER BY recovery_attempts, rowid LIMIT ?').all(limit);
   let completed = 0;
   for (const delivery of pending) {
+    db.prepare('UPDATE deliveries SET recovery_attempts = recovery_attempts + 1 WHERE provider_key = ?')
+      .run(delivery.provider_key);
     try {
       const [platform, spaceId] = JSON.parse(delivery.scope);
       if (platform !== 'imessage') continue;
