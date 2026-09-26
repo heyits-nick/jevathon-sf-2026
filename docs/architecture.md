@@ -21,11 +21,15 @@ Proposed shape; confirm against the Jev console docs.
 
 ## Aggregation and escalation
 
-- Restaurant score: share of dishes with `verdict = yes` above a confidence
-  threshold, plus a count of `unclear`.
-- Escalate when the share of `unclear` dishes or the average confidence crosses
-  a threshold. Escalation fetches reviews and diet-site text, and Jev re-scores
-  only the uncertain dishes with that extra context.
+- Restaurant `score`: share of all dishes with `verdict = yes` and confidence
+  at or above `YES_MIN_CONFIDENCE`. This says how much of the menu fits the
+  diet, not how sure we are.
+- Restaurant `confidence`: mean of the per-dish confidences. This says how sure
+  we are.
+- Escalate when the share of `unclear` dishes is above `MAX_UNCLEAR_SHARE` or
+  restaurant `confidence` is below `MIN_CONFIDENCE`. A low `score` alone never
+  triggers escalation. Escalation fetches reviews and diet-site text, and Jev
+  re-scores only the uncertain dishes with that extra context.
 - Thresholds live in one config file so they can be tuned during the demo prep.
 
 ## API contract (draft)
@@ -42,15 +46,24 @@ Response:
 {
   "restaurant": "Name",
   "diet": "vegan",
-  "score": 0.72,
+  "score": 0.5,
+  "confidence": 0.68,
   "escalated": true,
+  "before_escalation": { "score": 0.5, "confidence": 0.62 },
   "dishes": [
-    { "name": "Tofu bowl", "verdict": "yes", "confidence": 0.94, "source": "menu" },
-    { "name": "Pad thai", "verdict": "unclear", "confidence": 0.41, "source": "menu+reviews" }
+    { "name": "Tofu bowl", "verdict": "yes", "confidence": 0.94, "source": "menu", "jev_ms": 180 },
+    { "name": "Pad thai", "verdict": "unclear", "confidence": 0.41, "source": "menu+reviews", "jev_ms": 200 }
   ],
-  "timing_ms": { "fetch": 4200, "jev_total": 380 }
+  "timing_ms": { "fetch": 4200, "jev_total": 380 },
+  "jev_cost_usd": 0.002
 }
 ```
+
+- `score` and `confidence` are final values (after escalation, if any).
+- `before_escalation` holds the values from the first pass, for the confidence
+  meter. It is `null` when `escalated` is `false`.
+- `jev_ms` is the latency of the last Jev call for that dish. `jev_cost_usd` is
+  the total Jev cost for the request. Values above are illustrative only.
 
 ## Trade-offs
 
