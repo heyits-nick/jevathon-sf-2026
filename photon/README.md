@@ -31,7 +31,12 @@ explicitly approves that message, run the same command with `--send-approved`.
 This sends one setup message, without claiming the trip backend is connected.
 Do not run it automatically or send to any other recipient. Wait for the
 listener/backend readiness announcement before replying. Dedicated-line and
-shared-pool allocation details are in the official Photon routing docs.
+shared-pool allocation details are in the official Photon routing docs. On a
+Free/Pro shared-pool project, first add the presenter's iMessage-linked handle
+under **Project → Users** in the Photon dashboard; Photon rejects sends to
+unregistered recipients. If the phone number does not match the handle Apple
+uses, [Photon's debug line](https://debug.photon.codes) reports the actual
+phone or email handle.
 
 Each sender and conversation gets its own token. A duplicate delivery does
 not call the backend or send a second reply after a successful send. An
