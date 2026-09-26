@@ -78,4 +78,21 @@ folder to avoid merge conflicts.
 
 ## Setup and demo
 
-To be filled in as components land.
+### `backend/scoring` — trip API (Python 3.12, [uv](https://docs.astral.sh/uv/))
+
+```bash
+cd backend/scoring
+uv sync
+uv run uvicorn backend_scoring.main:app --reload --port 8000
+uv run pytest -q
+```
+
+Serves the canonical contract from `docs/architecture.md` at the root path: `POST /trips`,
+`GET /trips/{id}`, `POST /trips/{id}/messages`. `POST /score` is a separate, not-yet-built slice.
+Trips persist to a real SQLite file (`backend/scoring/data/trips.db`, git-ignored; override the
+path with `TRIP_DB_PATH`), not an in-memory map, so state survives a restart. No environment
+variables are required yet — Jev/API-key wiring lands with the scoring slice.
+
+Point `web/` at it locally via `web/.env.local`: `BACKEND_API_URL=http://localhost:8000`.
+
+Other components (`backend/menu_fetch/`, `photon/`, `voice/`) are not yet scaffolded.
