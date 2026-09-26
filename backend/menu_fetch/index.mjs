@@ -103,3 +103,38 @@ export async function fetchMenu(inputUrl, { restaurant, kind = 'menu', client, r
     throw new MenuFetchError('PROVIDER_FAILURE', 'Browserbase could not fetch this source.', true);
   }
 }
+
+// Search is retrieval only. The caller/Jev chooses the query and which result IDs to use.
+export async function searchSources(query, { limit = 5, request = fetch, apiKey = process.env.BROWSERBASE_API_KEY, timeoutMs = 10000 } = {}) {
+  if (typeof query !== 'string' || !query.trim() || query.length > 200 || !Number.isInteger(limit) || limit < 1 || limit > 5) {
+    throw new MenuFetchError('INVALID_SEARCH', 'Provide a query and a limit from 1 to 5.');
+  }
+  if (!apiKey) throw new MenuFetchError('NOT_CONFIGURED', 'Browserbase is not configured.', true);
+  const started = performance.now();
+  try {
+    const apiResponse = await request('https://api.browserbase.com/v1/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-BB-API-Key': apiKey },
+      body: JSON.stringify({ query: query.trim(), numResults: limit }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!apiResponse.ok) throw new Error('Browserbase Search API request failed');
+    const data = await apiResponse.json();
+    if (!Array.isArray(data.results)) throw new Error('Invalid Browserbase Search response');
+    const results = data.results.slice(0, limit).filter(r => {
+      if (typeof r.id !== 'string' || typeof r.title !== 'string' || typeof r.url !== 'string') return false;
+      try {
+        const url = new URL(r.url);
+        return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password;
+      } catch { return false; }
+    }).map(r => ({
+      id: r.id,
+      title: r.title,
+      url: r.url,
+      snippet: typeof r.snippet === 'string' ? r.snippet : null,
+    }));
+    return { query: data.query ?? query.trim(), results, timing_ms: Math.round(performance.now() - started) };
+  } catch {
+    throw new MenuFetchError('SEARCH_PROVIDER_FAILURE', 'Browserbase could not search for sources.', true);
+  }
+}

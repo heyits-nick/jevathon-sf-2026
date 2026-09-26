@@ -13,4 +13,7 @@ Run `node --env-file=../../.env cli.mjs 'https://www.lullanyc.com/menu/all-day/'
 
 Optional local HTTP bridge: `node --env-file=../../.env cli.mjs serve`, then `POST http://127.0.0.1:8101/fetch-menu` with JSON `{ "menu_url": "https://...", "restaurant": "..." }`. Set `MENU_FETCH_PORT` to change port. Set `MENU_FETCH_HOST` and `MENU_FETCH_TOKEN` for nonlocal access; the bearer token is required there. The shared backend should call the module directly when running in Node.
 
+Search retrieval: call `searchSources(query, { limit: 3 })` or `POST http://127.0.0.1:8101/search-sources` with `{ "query": "Lulla NYC official menu", "limit": 3 }`. Limit is 1–5. The result is `{query,results:[{id,title,url,snippet}],timing_ms}`. Browserbase Search often omits snippets; in that case `snippet` is `null`. Results are untrusted candidates, not selected restaurants or approved menu sources. The backend supplies the query, asks Jev to choose among returned IDs, then calls `fetchMenu` on the selected URL.
+
 Browserbase uses [Fetch API markdown mode](https://www.browserbase.com/blog/fetch-api) through its [documented endpoint and API-key header](https://github.com/browserbase/skills/blob/main/skills/fetch/REFERENCE.md), with redirects disabled by the documented `allowRedirects` option. Browser rendering/PDF support is outside this narrow public HTML path.
+Search uses Browserbase's [documented Search endpoint](https://github.com/browserbase/skills/blob/main/skills/search/REFERENCE.md) directly; no SDK dependency is needed.
