@@ -1,0 +1,44 @@
+{
+  "label": "DEVELOPMENT/TEST DATA - hand-labeled expected answers, not a live result",
+  "id": "greens-sf-gluten-free",
+  "restaurant": "Greens Restaurant",
+  "menu_url": "https://www.greensrestaurant.com/s/092326-Dinner-menu.pdf",
+  "diet": "gluten-free",
+  "menu_format": "pdf",
+  "checked_at": "2026-09-26T13:39:00-07:00",
+  "checked_by": "David Larochelle (with Claude)",
+  "case_type": "ambiguous",
+  "expected_dishes": [
+    {
+      "name": "FRIED CAULIFLOWER",
+      "verdict": "yes",
+      "evidence": "tartar sauce, garlic-herb seasoning, lemon | vp, gf",
+      "note": "Marked gf. Trap: fried, but labeled gluten free."
+    },
+    {
+      "name": "POZOLE VERDE",
+      "verdict": "yes",
+      "evidence": "EUTS Farm zucchini, Brentwood corn, hominy, Rancho Gordo beans, tomatillos, cilantro rice, cabbage, radishes, fried tortilla strips | v, gf",
+      "note": "Marked gf."
+    },
+    {
+      "name": "BRUSSELS SPROUTS CAESAR SALAD",
+      "verdict": "unclear",
+      "evidence": "baby gem lettuces, garlic toasted breadcrumbs, Grana Padano | gfp",
+      "note": "gfp = gluten free possible: has breadcrumbs as served; only on request."
+    },
+    {
+      "name": "GRILLED ANINA EGGPLANT",
+      "verdict": "unclear",
+      "evidence": "lemon-feta yogurt, harissa sauce, lemon oil, pine nuts, dill, za'atar focaccia | gfp",
+      "note": "Served with focaccia; gfp."
+    },
+    {
+      "name": "BLACK MISSION FIG PIZZA",
+      "verdict": "no",
+      "evidence": "caramelized onions, asiago cheese, fresh arugula, reduced balsamic, toasted walnuts, Pecorino Fiore Sardo",
+      "note": "Pizza with no gf or gfp mark on a menu that marks gluten-free items."
+    }
+  ],
+  "notes": "Legend: 'GF - gluten free, GFP - gluten free possible'. Dated PDF (file name 092326); will change. PDF parsing is P2."
+}

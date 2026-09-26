@@ -1,0 +1,44 @@
+{
+  "label": "DEVELOPMENT/TEST DATA - hand-labeled expected answers, not a live result",
+  "id": "house-of-prime-rib-gluten-free",
+  "restaurant": "House of Prime Rib",
+  "menu_url": "https://houseofprimerib.net/",
+  "diet": "gluten-free",
+  "menu_format": "html",
+  "checked_at": "2026-09-26T13:39:00-07:00",
+  "checked_by": "David Larochelle (with Claude)",
+  "case_type": "ambiguous",
+  "expected_dishes": [
+    {
+      "name": "Yorkshire Pudding",
+      "verdict": "no",
+      "evidence": "Light, airy batter baked to a golden brown dome, with a fluffy interior to soak up those savory beef juices.",
+      "note": "Yorkshire pudding is a wheat-flour batter."
+    },
+    {
+      "name": "Or Baked Potato",
+      "verdict": "yes",
+      "evidence": "A superior sized Idaho potato served with butter and sour cream, with a sprinkle of chives.",
+      "note": "Listed ingredients are gluten-free."
+    },
+    {
+      "name": "Mashed Potatoes",
+      "verdict": "unclear",
+      "evidence": "A generous steaming helping of the all American favorite, served with thick brown gravy.",
+      "note": "Thick gravy is often flour-thickened; not stated."
+    },
+    {
+      "name": "Creamed Spinach",
+      "verdict": "unclear",
+      "evidence": "A light dish of garden spinach whipped with fresh cream and pieces of bacon.",
+      "note": "Creamed dishes may use a flour roux; not stated."
+    },
+    {
+      "name": "The City Cut",
+      "verdict": "unclear",
+      "evidence": "a smaller cut for the lighter appetite.",
+      "note": "Plain beef, but seasoning and jus are not described. Trap: meat-heavy menu is not automatically gluten-free."
+    }
+  ],
+  "notes": "No gluten labels on this menu."
+}

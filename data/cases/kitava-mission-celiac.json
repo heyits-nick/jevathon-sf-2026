@@ -1,0 +1,44 @@
+{
+  "label": "DEVELOPMENT/TEST DATA - hand-labeled expected answers, not a live result",
+  "id": "kitava-mission-celiac",
+  "restaurant": "Kitava (Mission District)",
+  "menu_url": "https://www.kitava.com/kitava-mission-district-menus/",
+  "diet": "celiac",
+  "menu_format": "html",
+  "checked_at": "2026-09-26T13:52:00-07:00",
+  "checked_by": "David Larochelle (with Claude)",
+  "case_type": "clear_pass",
+  "expected_dishes": [
+    {
+      "name": "Chicken Nuggets",
+      "verdict": "yes",
+      "evidence": "Cassava flour breaded chicken, served with house made ketchup",
+      "note": "Trap: breaded, but with cassava flour, in a kitchen that states it is gluten-free."
+    },
+    {
+      "name": "Sesame Chicken Bowl",
+      "verdict": "yes",
+      "evidence": "Jasmine rice, crispy chicken with cassava flour breading, charred broccoli, sesame togarashi, scallions, ginger ponzu sauce",
+      "note": "Trap: ponzu is usually made with wheat soy sauce, but the menu states it is 100% free of gluten and soy."
+    },
+    {
+      "name": "Evolved Caesar Salad",
+      "verdict": "yes",
+      "evidence": "Farmer’s greens, sliced radish, pastured egg, avocado, gluten-free croutons, cashew “parmesan,\" herb ranch dressing",
+      "note": "Trap: croutons are labeled gluten-free."
+    },
+    {
+      "name": "Dark Chocolate Brownie",
+      "verdict": "yes",
+      "evidence": "Rich and fudgy brownie made with cassava and coconut flour, pastured eggs, and coconut sugar",
+      "note": "Gluten-free flours."
+    },
+    {
+      "name": "Chocolate Chip Cookie",
+      "verdict": "yes",
+      "evidence": "Dark chocolate chip cookie made with GF flour mix, egg, vanilla, and dark chocolate sweetened with coconut sugar. Contains almonds and eggs.",
+      "note": "GF flour mix."
+    }
+  ],
+  "notes": "Restaurant-wide statement '100% free of gluten, dairy, soy, peanuts, refined sugar & seed oils.' is a kitchen-level claim, which satisfies the celiac rule. The oat-based Plant Protein Patty is left out on purpose because oats are contested for celiac."
+}

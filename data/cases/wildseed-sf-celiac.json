@@ -1,0 +1,44 @@
+{
+  "label": "DEVELOPMENT/TEST DATA - hand-labeled expected answers, not a live result",
+  "id": "wildseed-sf-celiac",
+  "restaurant": "Wildseed (San Francisco)",
+  "menu_url": "https://www.wildseedsf.com/san-francisco-menus/",
+  "diet": "celiac",
+  "menu_format": "html",
+  "checked_at": "2026-09-26T13:52:00-07:00",
+  "checked_by": "David Larochelle (with Claude)",
+  "case_type": "ambiguous",
+  "expected_dishes": [
+    {
+      "name": "Kale caesar salad",
+      "verdict": "no",
+      "evidence": "lacinato kale, gem lettuce, farro, levain croutons, coconut parmesan, vegan caesar dressing (cg)",
+      "note": "Marked cg."
+    },
+    {
+      "name": "Crispy mushroom bao",
+      "verdict": "no",
+      "evidence": "tempura maitake mushroom, cucumber, pickled carrot, sesame cabbage slaw, sriracha, cilantro (cg)",
+      "note": "Marked cg."
+    },
+    {
+      "name": "Fries",
+      "verdict": "unclear",
+      "evidence": "vegan herb aioli, vegan chipotle aioli, curry ketchup",
+      "note": "No cg mark, but the menu also has tempura and breaded items and says nothing about a dedicated fryer."
+    },
+    {
+      "name": "Potato",
+      "verdict": "unclear",
+      "evidence": "shaved potatoes, castelvetrano olives, rosemary, capers, red onion, chili flakes, extra virgin olive oil, lemon, coconut mozzarella (cg)",
+      "note": "A gluten-free crust substitution is offered, but it is baked alongside wheat pizzas."
+    },
+    {
+      "name": "Spicy cucumbers",
+      "verdict": "unclear",
+      "evidence": "sesame, gochugaru, red onion, avocado, furikake",
+      "note": "No cg mark; cross-contact not addressed."
+    }
+  ],
+  "notes": "No celiac, allergen, or fryer statement on the page."
+}

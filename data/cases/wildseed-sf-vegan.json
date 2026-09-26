@@ -1,0 +1,44 @@
+{
+  "label": "DEVELOPMENT/TEST DATA - hand-labeled expected answers, not a live result",
+  "id": "wildseed-sf-vegan",
+  "restaurant": "Wildseed (San Francisco)",
+  "menu_url": "https://www.wildseedsf.com/san-francisco-menus/",
+  "diet": "vegan",
+  "menu_format": "html",
+  "checked_at": "2026-09-26T13:39:00-07:00",
+  "checked_by": "David Larochelle (with Claude)",
+  "case_type": "clear_pass",
+  "expected_dishes": [
+    {
+      "name": "Spicy chicken sandwich",
+      "verdict": "yes",
+      "evidence": "crispy Impossible chicken, celery and green apple slaw, pickled red onions, herb aioli, served with fries (cg)",
+      "note": "Trap: says 'chicken', but the menu states it is 100% plant-based and names Impossible chicken."
+    },
+    {
+      "name": "Fries",
+      "verdict": "yes",
+      "evidence": "vegan herb aioli, vegan chipotle aioli, curry ketchup",
+      "note": "Sauces are labeled vegan."
+    },
+    {
+      "name": "Kale caesar salad",
+      "verdict": "yes",
+      "evidence": "lacinato kale, gem lettuce, farro, levain croutons, coconut parmesan, vegan caesar dressing (cg)",
+      "note": "Caesar and parmesan are named vegan/coconut versions."
+    },
+    {
+      "name": "Crispy brussels sprouts",
+      "verdict": "yes",
+      "evidence": "smoked tempeh bacon, pickled ginger, ginger & miso glaze",
+      "note": "Trap: 'bacon' is tempeh bacon."
+    },
+    {
+      "name": "Spicy sausage",
+      "verdict": "yes",
+      "evidence": "marinara, red onion, basil, mushrooms, jackfruit italian sausage, calabrian chilis, coconut mozzarella, coconut parmesan (cg)",
+      "note": "Pizza; sausage and cheese are plant-based."
+    }
+  ],
+  "notes": "Page states: 'Our menu is 100% plant-based.' Menu has lunch, dinner, and brunch tabs on one HTML page."
+}

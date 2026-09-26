@@ -1,0 +1,44 @@
+{
+  "label": "DEVELOPMENT/TEST DATA - hand-labeled expected answers, not a live result",
+  "id": "fin-thai-sf-gluten-free",
+  "restaurant": "Fin Thai SF",
+  "menu_url": "https://finthaisf.com/san-francisco-fin-thai-sf-food-menu",
+  "diet": "gluten-free",
+  "menu_format": "html",
+  "checked_at": "2026-09-26T13:39:00-07:00",
+  "checked_by": "David Larochelle (with Claude)",
+  "case_type": "ambiguous",
+  "expected_dishes": [
+    {
+      "name": "Chicken Satay",
+      "verdict": "no",
+      "evidence": "Marinated grilled chicken served with Peanut sauce, Cucumber salad and white bread",
+      "note": "Served with white bread."
+    },
+    {
+      "name": "Fried Ice Cream",
+      "verdict": "no",
+      "evidence": "White bread, Vanilla ice cream, Chocolate, Strawberry, Whipped cream",
+      "note": "Trap: dessert made with white bread."
+    },
+    {
+      "name": "Garlic Shrimp",
+      "verdict": "unclear",
+      "evidence": "White shrimps, Fried garlic, Soy sauce, Oysters sauce, Black pepper",
+      "note": "Soy and oyster sauce usually contain wheat; the menu does not say which brand."
+    },
+    {
+      "name": "Pad Thai",
+      "verdict": "unclear",
+      "evidence": "Stir fried small rice noodle, fried tofu, egg, ground peanut, bean sprout",
+      "note": "Trap: rice noodles, but the sauce is not listed."
+    },
+    {
+      "name": "Seafood Dipping Sauce",
+      "verdict": "yes",
+      "evidence": "Green chili, garlic, fresh lime, sugar, vinegar, salt",
+      "note": "All listed ingredients are gluten-free. Trap: name says seafood, not gluten."
+    }
+  ],
+  "notes": "No gluten labels on this menu. Most dishes should be unclear."
+}
