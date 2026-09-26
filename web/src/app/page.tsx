@@ -1,13 +1,13 @@
 import { PageShell } from "@/components/page-shell";
-import { ScoreApp } from "@/components/score/score-app";
+import { TripApp } from "@/components/trip/trip-app";
 
 export default function Home() {
   return (
     <PageShell
-      title="Menu Check"
-      description="Diet tags on review sites are unreliable. We read the restaurant’s actual menu, have Jev judge every dish, and show you when we’re not sure."
+      title="Where should we eat?"
+      description="Save the posts that inspired you, tell us your diet, and we’ll read the real menus and show you what fits, with sources and honest uncertainty."
     >
-      <ScoreApp />
+      <TripApp />
     </PageShell>
   );
 }

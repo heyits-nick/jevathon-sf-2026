@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { Loader2Icon, SearchIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Field } from "@/components/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DIETS } from "@/lib/score/config";
 import type { ScoreRequest } from "@/lib/api/types";
@@ -68,14 +68,5 @@ export function ScoreForm({ onSubmit, loading }: ScoreFormProps) {
         {loading ? "Checking…" : "Check menu"}
       </Button>
     </form>
-  );
-}
-
-function Field({ id, label, children }: { id: string; label: string; children: React.ReactNode }) {
-  return (
-    <div className="grid gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      {children}
-    </div>
   );
 }
