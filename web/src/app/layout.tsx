@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Jev console",
-  description: "Inspector for the same stored trip as iMessage: evidence, typed Jev decisions, and presenter tools.",
+  description: "Inspector for a stored trip: evidence, typed Jev decisions, and presenter tools.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

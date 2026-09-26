@@ -5,7 +5,7 @@ export default function Home() {
   return (
     <PageShell
       title="Jev console"
-      description="iMessage is the traveler’s path. This page is the inspector: the same stored trip, the evidence Jev used, and every typed decision it recorded."
+      description="Inspect a stored trip: the evidence Jev used and every typed decision it recorded. iMessage and voice reach the same backend; iMessage conversations keep their own trip."
     >
       <TripApp />
     </PageShell>

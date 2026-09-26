@@ -14,13 +14,13 @@ interface OperatorToolsProps {
   voiceSlot?: React.ReactNode;
 }
 
-/** Web fallback and presenter controls. Travelers interact over iMessage. */
+/** Presenter controls for driving this trip from the browser. */
 export function OperatorTools({ trip, pending, onSend, onRetry, voiceSlot }: OperatorToolsProps) {
   return (
     <details className="rounded-lg border">
       <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
         Presenter tools
-        <span className="ml-2 font-normal text-muted-foreground">Drive this trip from the browser if iMessage is not paired</span>
+        <span className="ml-2 font-normal text-muted-foreground">Drive this trip from the browser</span>
       </summary>
       <div className="space-y-6 border-t px-4 py-4">
         <SavedPosts saves={trip.saves} />

@@ -38,10 +38,10 @@ export function TripApp({ voiceSlot }: { voiceSlot?: React.ReactNode }) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Pair a trip</CardTitle>
+          <CardTitle>Start a trip</CardTitle>
           <CardDescription>
-            Create a session so this console can watch the same trip as iMessage. Fields are optional;
-            the traveler can send diet and destination by text.
+            Create a trip to drive and inspect from this console. Fields are optional; you can send
+            diet and destination as messages. iMessage conversations keep their own separate trip.
           </CardDescription>
         </CardHeader>
         <CardContent>
