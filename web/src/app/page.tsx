@@ -4,8 +4,8 @@ import { TripApp } from "@/components/trip/trip-app";
 export default function Home() {
   return (
     <PageShell
-      title="Where should we eat?"
-      description="Save the posts that inspired you, tell us your diet, and we’ll read the real menus and show you what fits, with sources and honest uncertainty."
+      title="Jev console"
+      description="Inspect a stored trip: the evidence Jev used and every typed decision it recorded. iMessage and voice reach the same backend; iMessage conversations keep their own trip."
     >
       <TripApp />
     </PageShell>

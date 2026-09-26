@@ -39,7 +39,12 @@ export function CandidateCard({
 }: CandidateCardProps) {
   const choosing = selection?.status === "sending";
   const details = (
-    <ScoreResult result={candidate.score_result} evidence={candidateEvidence(candidate)} showRestaurantName={false} />
+    <ScoreResult
+      result={candidate.score_result}
+      evidence={candidateEvidence(candidate)}
+      showRestaurantName={false}
+      showTrace={false}
+    />
   );
 
   return (

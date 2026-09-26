@@ -4,12 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTrip } from "@/hooks/use-trip";
 import type { Candidate } from "@/lib/api/types";
+import { JevTrace } from "@/components/jev/jev-trace";
+import { tripEvidence } from "@/lib/trip/evidence";
 import { CandidateList } from "./candidate-list";
-import { Conversation } from "./conversation";
-import { DecisionTrace } from "./decision-trace";
 import { InlineError } from "./inline-error";
-import { SavedPosts } from "./saved-posts";
-import { TripComposer } from "./trip-composer";
+import { OperatorTools } from "./operator-tools";
 import { TripHeader } from "./trip-header";
 import { TripNotices } from "./trip-notices";
 import { TripStartForm } from "./trip-start-form";
@@ -40,7 +39,10 @@ export function TripApp({ voiceSlot }: { voiceSlot?: React.ReactNode }) {
       <Card>
         <CardHeader>
           <CardTitle>Start a trip</CardTitle>
-          <CardDescription>Everything is optional. You can add details later by message.</CardDescription>
+          <CardDescription>
+            Create a trip to drive and inspect from this console. Fields are optional; you can send
+            diet and destination as messages. iMessage conversations keep their own separate trip.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <TripStartForm onCreate={createTrip} pending={creating !== null && !creating.error} error={creating?.error} />
@@ -51,14 +53,10 @@ export function TripApp({ voiceSlot }: { voiceSlot?: React.ReactNode }) {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardContent className="space-y-4">
-          <TripHeader trip={trip} refreshing={load.status === "loading"} onRefresh={refresh} onStartOver={startOver} />
-          {load.status === "error" && <InlineError message={load.error} onRetry={refresh} />}
-          <TripNotices trip={trip} lastReply={lastReply} />
-          <DecisionTrace decisions={trip.decisions} />
-        </CardContent>
-      </Card>
+      <TripHeader trip={trip} refreshing={load.status === "loading"} onRefresh={refresh} onStartOver={startOver} />
+      {load.status === "error" && <InlineError message={load.error} onRetry={refresh} />}
+      <TripNotices trip={trip} lastReply={lastReply} />
+      <JevTrace decisions={trip.decisions} evidence={tripEvidence(trip)} candidates={trip.candidates} />
       <CandidateList
         trip={trip}
         selection={selection}
@@ -66,19 +64,13 @@ export function TripApp({ voiceSlot }: { voiceSlot?: React.ReactNode }) {
         onChoose={chooseCandidate}
         onRetry={retryMessage}
       />
-      <Card>
-        <CardContent className="space-y-6">
-          <SavedPosts saves={trip.saves} />
-          <Conversation messages={trip.messages} />
-          <TripComposer
-            pending={messagePending}
-            onSend={sendMessage}
-            onRetry={retryMessage}
-            clarification={trip.status === "needs_clarification" ? trip.clarification : null}
-            voiceSlot={voiceSlot}
-          />
-        </CardContent>
-      </Card>
+      <OperatorTools
+        trip={trip}
+        pending={messagePending}
+        onSend={sendMessage}
+        onRetry={retryMessage}
+        voiceSlot={voiceSlot}
+      />
     </div>
   );
 }

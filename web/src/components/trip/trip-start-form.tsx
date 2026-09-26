@@ -67,7 +67,7 @@ export function TripStartForm({ onCreate, pending, error }: TripStartFormProps) 
       <div className="flex flex-col gap-3 sm:col-span-2 sm:flex-row sm:items-center">
         <Button type="submit" disabled={pending}>
           {pending ? <Loader2Icon className="animate-spin" /> : <PlaneTakeoffIcon />}
-          {pending ? "Creating trip…" : "Start trip"}
+          {pending ? "Creating…" : "Open console"}
         </Button>
         {error && <InlineError message={error} />}
       </div>
