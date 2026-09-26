@@ -18,6 +18,30 @@ export const SAMPLE_SCORE: ScoreResponse = {
   ],
   timing_ms: { fetch: 4200, jev_total: 1105 },
   jev_cost_usd: 0.00012,
+  decisions: [
+    {
+      id: "sd1",
+      stage: "dietary",
+      model: "jev-1.13.0",
+      choice: "yes",
+      confidence: 0.94,
+      probabilities: { yes: 0.94, no: 0.04, unclear: 0.02 },
+      evidence_ids: ["e1"],
+      duration_ms: 180,
+      created_at: "2026-09-26T20:40:01Z",
+    },
+    {
+      id: "sd2",
+      stage: "escalation",
+      model: "jev-1.13.0",
+      choice: "seek_evidence",
+      confidence: 0.61,
+      probabilities: { seek_evidence: 0.61, stop: 0.39 },
+      evidence_ids: ["e2"],
+      duration_ms: 150,
+      created_at: "2026-09-26T20:40:04Z",
+    },
+  ],
   evidence: [
     {
       id: "e1",

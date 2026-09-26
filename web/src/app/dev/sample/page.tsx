@@ -7,7 +7,7 @@ export default function SamplePage() {
   if (process.env.NODE_ENV === "production") notFound();
 
   return (
-    <PageShell title="Sample layouts" description="Development-only preview of trip and result components.">
+    <PageShell title="Sample console" description="Development-only preview of the inspector. Sample data — no live call.">
       <div className="space-y-6">
         <SampleDataBanner />
         <SampleTripPreview />

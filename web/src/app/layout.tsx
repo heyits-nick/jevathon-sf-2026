@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Menu Check",
-  description: "Restaurant menus you can trust for your diet, scored dish by dish with Jev.",
+  title: "Jev console",
+  description: "Inspector for the same stored trip as iMessage: evidence, typed Jev decisions, and presenter tools.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

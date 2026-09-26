@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 const NAV = [
-  { href: "/", label: "Trip" },
+  { href: "/", label: "Console" },
   { href: "/score", label: "Check a menu" },
 ];
 
@@ -13,7 +13,7 @@ interface PageShellProps {
 
 export function PageShell({ title, description, children }: PageShellProps) {
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:py-12">
+    <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-8 sm:py-12">
       <nav aria-label="Main" className="mb-8 flex gap-4 text-sm">
         {NAV.map((item) => (
           <Link

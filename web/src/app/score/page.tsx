@@ -5,7 +5,7 @@ export default function ScorePage() {
   return (
     <PageShell
       title="Check a menu"
-      description="Diet tags on review sites are unreliable. We read the restaurant’s actual menu, have Jev judge every dish, and show you when we’re not sure."
+      description="Presenter tool. Score one restaurant through the live POST /score path if the trip flow is still integrating."
     >
       <ScoreApp />
     </PageShell>

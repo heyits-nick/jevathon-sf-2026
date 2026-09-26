@@ -5,6 +5,7 @@ import { ConfidenceMeter } from "./confidence-meter";
 import { DishList } from "./dish-list";
 import { EvidenceList } from "./evidence-list";
 import { RestaurantSummary } from "./restaurant-summary";
+import { JevTrace } from "@/components/jev/jev-trace";
 import { TimingStats } from "./timing-stats";
 
 interface ScoreResultProps {
@@ -16,6 +17,8 @@ interface ScoreResultProps {
   evidence?: Evidence[];
   /** Hide when the surrounding card already titles the restaurant. */
   showRestaurantName?: boolean;
+  /** Trip cards already show the trip-level rail; keep this for the standalone score page. */
+  showTrace?: boolean;
 }
 
 export function ScoreResult({
@@ -24,6 +27,7 @@ export function ScoreResult({
   runKey,
   evidence = result.evidence ?? [],
   showRestaurantName = true,
+  showTrace = true,
 }: ScoreResultProps) {
   return (
     <div className="space-y-6">
@@ -36,6 +40,7 @@ export function ScoreResult({
       ))}
       <ConfidenceMeter key={runKey} result={result} />
       <TimingStats result={result} roundTripMs={roundTripMs} />
+      {showTrace && <JevTrace decisions={result.decisions ?? []} evidence={evidence} costUsd={result.jev_cost_usd} />}
       <DishList dishes={result.dishes} />
       <EvidenceList evidence={evidence} />
     </div>

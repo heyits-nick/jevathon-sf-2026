@@ -45,7 +45,7 @@ export function TripHeader({ trip, refreshing, onRefresh, onStartOver }: TripHea
         ))}
       </dl>
       <p className="text-xs text-muted-foreground">
-        To change preferences, tell us in a message, e.g. &ldquo;Make this vegan and under $25.&rdquo;
+        Preferences change when the traveler texts them, or from Presenter tools below.
       </p>
     </div>
   );

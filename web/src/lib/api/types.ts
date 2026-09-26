@@ -18,6 +18,8 @@ export interface DecisionTrace {
   model: string;
   choice?: string;
   confidence?: number;
+  /** Optional additive field. Per-option probabilities from a Jev Choice answer. */
+  probabilities?: Record<string, number>;
   evidence_ids: string[];
   duration_ms: number;
   created_at: string;
