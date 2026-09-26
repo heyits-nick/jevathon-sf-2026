@@ -16,6 +16,8 @@ export function mountVoice(container, { tripId, accessToken, voiceBase = '', onT
   }
   container.replaceChildren(start, stop, status, transcript, ...(form ? [form] : []));
   let conversation;
+  let disposed = false;
+  let stopRequested = false;
   const request = async (action, data) => {
     const response = await fetch(`${base}/${action}`, {
       method: action === 'context' ? 'GET' : 'POST',
@@ -39,11 +41,14 @@ export function mountVoice(container, { tripId, accessToken, voiceBase = '', onT
   };
   const fallbackHint = showTextFallback ? 'You can still type below.' : 'Use the trip message field.';
   start.onclick = async () => {
+    stopRequested = false;
     start.disabled = true; status.textContent = 'Connecting to voice…';
     try {
       const { Conversation } = await import('https://esm.sh/@elevenlabs/client@1.10.0');
+      if (disposed) return;
       const { signed_url } = await request('session');
-      conversation = await Conversation.startSession({ signedUrl: signed_url,
+      if (disposed) return;
+      const started = await Conversation.startSession({ signedUrl: signed_url,
         dynamicVariables: { trip_id: tripId },
         clientTools: {
           getTripContext: async ({ trip_id }) => trip_id === tripId ? request('context') : { error: 'Trip mismatch' },
@@ -54,18 +59,21 @@ export function mountVoice(container, { tripId, accessToken, voiceBase = '', onT
         onMessage: ({ source, message }) => { if (message) addLine(source === 'user' ? 'You' : 'Jev', message); },
         onError: () => { status.textContent = `Voice unavailable. ${fallbackHint}`; }
       });
+      if (disposed || stopRequested) await started.endSession();
+      else conversation = started;
     } catch {
+      if (disposed) return;
       status.textContent = `Voice unavailable or microphone denied. ${fallbackHint}`; start.disabled = false;
     }
   };
-  stop.onclick = async () => { if (conversation) await conversation.endSession(); conversation = undefined; };
+  stop.onclick = async () => { stopRequested = true; if (conversation) await conversation.endSession(); conversation = undefined; };
   if (form) form.onsubmit = async event => {
     event.preventDefault(); const text = input.value.trim(); if (!text) return;
     submit.disabled = true; addLine('You', text); input.value = '';
     const result = await handleMessage({ trip_id: tripId, client_message_id: crypto.randomUUID(), text });
     addLine('Jev', result.reply || result.error); submit.disabled = false;
   };
-  return () => { conversation?.endSession(); container.replaceChildren(); };
+  return () => { disposed = true; conversation?.endSession(); container.replaceChildren(); };
 }
 
 if (typeof window !== 'undefined') window.JevVoice = { mountVoice };
