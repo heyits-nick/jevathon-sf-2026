@@ -170,7 +170,10 @@ test('keeps an API path prefix and passes the trip bearer token', async () => {
   });
   await backend.createTrip();
   await backend.sendMessage('trip/one', 'private-token', { client_message_id: 'x', text: 'hi' });
+  await backend.getTrip('trip/one', 'private-token');
   assert.equal(calls[0].url, 'https://api.example.com/api/trips');
   assert.equal(calls[1].url, 'https://api.example.com/api/trips/trip%2Fone/messages');
   assert.equal(calls[1].options.headers.authorization, 'Bearer private-token');
+  assert.equal(calls[2].url, 'https://api.example.com/api/trips/trip%2Fone');
+  assert.equal(calls[2].options.headers.authorization, 'Bearer private-token');
 });

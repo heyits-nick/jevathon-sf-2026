@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTrip } from "@/hooks/use-trip";
 import type { Candidate } from "@/lib/api/types";
+import { loadTripSession } from "@/lib/api/trip-session";
 import { JevTrace } from "@/components/jev/jev-trace";
 import { tripEvidence } from "@/lib/trip/evidence";
 import { CandidateList } from "./candidate-list";
@@ -12,6 +13,8 @@ import { OperatorTools } from "./operator-tools";
 import { TripHeader } from "./trip-header";
 import { TripNotices } from "./trip-notices";
 import { TripStartForm } from "./trip-start-form";
+import { TripResumeForm } from "./trip-resume-form";
+import { VoiceControl } from "./voice-control";
 
 export function TripApp({ voiceSlot }: { voiceSlot?: React.ReactNode }) {
   const { trip, load, lastReply, pending, creating, createTrip, refresh, sendMessage, retryMessage, startOver } = useTrip();
@@ -20,6 +23,12 @@ export function TripApp({ voiceSlot }: { voiceSlot?: React.ReactNode }) {
   const messagePending = selection ? null : pending;
   const chooseCandidate = (candidate: Candidate) =>
     sendMessage({ text: `I'll go with ${candidate.restaurant}.`, selected_candidate_id: candidate.id });
+  const session = trip ? loadTripSession() : null;
+  const voiceBase = process.env.NEXT_PUBLIC_VOICE_BASE_URL ||
+    (process.env.NODE_ENV === "development" ? "http://localhost:8788" : "");
+  const activeVoice = trip && session?.tripId === trip.id && voiceBase ? (
+    <VoiceControl tripId={trip.id} accessToken={session.token} voiceBase={voiceBase} onTrip={() => { void refresh(); }} />
+  ) : null;
 
   if (load.status === "restoring" || (load.status === "loading" && !trip)) {
     return <Skeleton className="h-64 w-full" />;
@@ -38,14 +47,14 @@ export function TripApp({ voiceSlot }: { voiceSlot?: React.ReactNode }) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Start a trip</CardTitle>
+          <CardTitle>Pair a trip</CardTitle>
           <CardDescription>
-            Create a trip to drive and inspect from this console. Fields are optional; you can send
-            diet and destination as messages. iMessage conversations keep their own separate trip.
+            Create a trip or open an existing iMessage trip with its access token.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <TripStartForm onCreate={createTrip} pending={creating !== null && !creating.error} error={creating?.error} />
+          <TripResumeForm />
         </CardContent>
       </Card>
     );
@@ -69,7 +78,7 @@ export function TripApp({ voiceSlot }: { voiceSlot?: React.ReactNode }) {
         pending={messagePending}
         onSend={sendMessage}
         onRetry={retryMessage}
-        voiceSlot={voiceSlot}
+        voiceSlot={voiceSlot ?? activeVoice}
       />
     </div>
   );

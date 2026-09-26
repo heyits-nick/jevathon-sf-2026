@@ -135,5 +135,13 @@ export function createBackend(baseUrl, fetchImpl = fetch) {
   return {
     createTrip: () => post('/trips', {}),
     sendMessage: (tripId, token, body) => post(`/trips/${encodeURIComponent(tripId)}/messages`, body, token),
+    async getTrip(tripId, token) {
+      const response = await fetchImpl(new URL(`trips/${encodeURIComponent(tripId)}`, base), {
+        headers: { authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!response.ok) throw new Error(`Backend HTTP ${response.status}`);
+      return response.json();
+    },
   };
 }

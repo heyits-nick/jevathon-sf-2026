@@ -17,6 +17,16 @@ node --env-file=.env photon/src/receiving-line.mjs
 node --env-file=.env photon/src/index.mjs
 ```
 
+To resume the presenter's iMessage trip in the web page or voice widget,
+keep the listener running and run `node --env-file=.env
+photon/src/export-trip.mjs` from the repository root. It finds the single
+trip associated with `PHOTON_TEST_RECIPIENT`, verifies its token against
+the backend, and writes `{trip_id,access_token}` to ignored
+`photon/.local/presenter-trip.json`. Open that private local file and paste
+its two values into the web page's resume form. Do not share the file, put
+the token in a URL, or commit it. The web page stores the token in the
+current browser tab's session storage.
+
 Set `PHOTON_TEST_RECIPIENT` in the local `.env` to the presenter's approved
 iMessage phone number in international format. The receiving-line command
 looks up its assigned Photon number without changing the project or sending
@@ -48,5 +58,5 @@ idempotent. On startup, the adapter retries up to 100 unfinished deliveries
 from SQLite, choosing the least retried first. It uses the same backend message ID, then sends their saved reply
 through the original conversation. Recovery sends as a conversation message
 rather than a threaded reply. Input remains in SQLite after a backend failure. The adapter
-does not provide a cross-device trip link until the web session has a safe
-pairing mechanism; a bare trip URL would not authorize access.
+does not provide a cross-device trip link; a bare trip URL would not
+authorize access.
