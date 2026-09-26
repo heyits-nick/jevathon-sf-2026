@@ -1,0 +1,44 @@
+{
+  "label": "DEVELOPMENT/TEST DATA - hand-labeled expected answers, not a live result",
+  "id": "greens-sf-vegan",
+  "restaurant": "Greens Restaurant",
+  "menu_url": "https://www.greensrestaurant.com/s/092326-Dinner-menu.pdf",
+  "diet": "vegan",
+  "menu_format": "pdf",
+  "checked_at": "2026-09-26T13:39:00-07:00",
+  "checked_by": "David Larochelle (with Claude)",
+  "case_type": "ambiguous",
+  "expected_dishes": [
+    {
+      "name": "POZOLE VERDE",
+      "verdict": "yes",
+      "evidence": "EUTS Farm zucchini, Brentwood corn, hominy, Rancho Gordo beans, tomatillos, cilantro rice, cabbage, radishes, fried tortilla strips | v, gf",
+      "note": "Marked v (vegan)."
+    },
+    {
+      "name": "FRESH SPRING ROLL",
+      "verdict": "yes",
+      "evidence": "Hodo tofu, pickled vegetables, rice noodles, beech mushroom & radish salad, sesame ginger vinaigrette, peanut sauce | v, gf",
+      "note": "Marked v."
+    },
+    {
+      "name": "MESQUITE GRILLED TOFU BROCHETTES",
+      "verdict": "unclear",
+      "evidence": "orzo & chickpea salad, marinated summer peppers, feta cheese, kalamata olives | vp",
+      "note": "vp = vegan possible: contains feta as served; vegan only on request."
+    },
+    {
+      "name": "WILD MUSHROOM WELLINGTON",
+      "verdict": "unclear",
+      "evidence": "porcini jus, roasted garlic mashed potatoes, baby carrots, sautéed jade beans",
+      "note": "Not marked v or vp; pastry and mashed potatoes may contain butter."
+    },
+    {
+      "name": "FRESH CONCHIGLIE PASTA",
+      "verdict": "unclear",
+      "evidence": "Jimmy Nardello pepper cream sauce, chanterelle mushrooms, garlic, lemon butter, basil-corn gremolata, Grana Padano | vp",
+      "note": "Contains cream, butter, and cheese as served; vp means a vegan version may be possible."
+    }
+  ],
+  "notes": "Vegetarian restaurant; menu is a dated PDF (file name 092326) linked from https://www.greensrestaurant.com/ and will change. Legend: 'V – vegan, VP – vegan possible'. PDF parsing is P2, so a correct result today may be a visible 'menu unreadable' state rather than dish verdicts."
+}

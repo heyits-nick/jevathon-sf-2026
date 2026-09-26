@@ -1,0 +1,44 @@
+{
+  "label": "DEVELOPMENT/TEST DATA - hand-labeled expected answers, not a live result",
+  "id": "wildseed-sf-vegetarian",
+  "restaurant": "Wildseed (San Francisco)",
+  "menu_url": "https://www.wildseedsf.com/san-francisco-menus/",
+  "diet": "vegetarian",
+  "menu_format": "html",
+  "checked_at": "2026-09-26T13:39:00-07:00",
+  "checked_by": "David Larochelle (with Claude)",
+  "case_type": "clear_pass",
+  "expected_dishes": [
+    {
+      "name": "Spicy chicken sandwich",
+      "verdict": "yes",
+      "evidence": "crispy Impossible chicken, celery and green apple slaw, pickled red onions, herb aioli, served with fries (cg)",
+      "note": "Trap: 'chicken' is Impossible chicken on a 100% plant-based menu."
+    },
+    {
+      "name": "Hummus basar",
+      "verdict": "yes",
+      "evidence": "white bean hummus, beyond hot italian sausage, kale, garlic, mushrooms, chickpeas, pine nuts, herbed flatbread (hp, cg)",
+      "note": "Trap: 'sausage' is Beyond sausage."
+    },
+    {
+      "name": "Crispy brussels sprouts",
+      "verdict": "yes",
+      "evidence": "smoked tempeh bacon, pickled ginger, ginger & miso glaze",
+      "note": "Trap: tempeh bacon."
+    },
+    {
+      "name": "Guacamole smash burger",
+      "verdict": "yes",
+      "evidence": "smashed impossible patty, taco seasoning, mashed avocado, crispy tortilla strips, pickled fresnos, chipotle aioli, lettuce, served with fries",
+      "note": "Impossible patty."
+    },
+    {
+      "name": "Beet poke",
+      "verdict": "yes",
+      "evidence": "ginger and sesame vinaigrette, avocado, cucumber, chives, seaweed salad, furikake, taro chips",
+      "note": "Trap: 'poke' usually means raw fish; here it is beets."
+    }
+  ],
+  "notes": "Page states: 'Our menu is 100% plant-based.' Plant-based implies vegetarian."
+}

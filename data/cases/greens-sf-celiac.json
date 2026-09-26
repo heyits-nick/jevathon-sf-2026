@@ -1,0 +1,44 @@
+{
+  "label": "DEVELOPMENT/TEST DATA - hand-labeled expected answers, not a live result",
+  "id": "greens-sf-celiac",
+  "restaurant": "Greens Restaurant",
+  "menu_url": "https://www.greensrestaurant.com/s/092326-Dinner-menu.pdf",
+  "diet": "celiac",
+  "menu_format": "pdf",
+  "checked_at": "2026-09-26T13:52:00-07:00",
+  "checked_by": "David Larochelle (with Claude)",
+  "case_type": "ambiguous",
+  "expected_dishes": [
+    {
+      "name": "FRIED CAULIFLOWER",
+      "verdict": "unclear",
+      "evidence": "tartar sauce, garlic-herb seasoning, lemon | vp, gf",
+      "note": "Labeled gf, but fryer is not described. Compare greens-sf-gluten-free, where this is yes."
+    },
+    {
+      "name": "GREEN GULCH POTATOES",
+      "verdict": "unclear",
+      "evidence": "dill, parsley, lemon butter | vp, gf",
+      "note": "Labeled gf; same kitchen makes pizza, pasta, and bread, and cross-contact is not addressed."
+    },
+    {
+      "name": "POZOLE VERDE",
+      "verdict": "unclear",
+      "evidence": "EUTS Farm zucchini, Brentwood corn, hominy, Rancho Gordo beans, tomatillos, cilantro rice, cabbage, radishes, fried tortilla strips | v, gf",
+      "note": "Labeled gf, but includes fried tortilla strips and the fryer is not described."
+    },
+    {
+      "name": "BRUSSELS SPROUTS CAESAR SALAD",
+      "verdict": "unclear",
+      "evidence": "baby gem lettuces, garlic toasted breadcrumbs, Grana Padano | gfp",
+      "note": "Breadcrumbs as served; the gfp version is made in a shared kitchen."
+    },
+    {
+      "name": "BLACK MISSION FIG PIZZA",
+      "verdict": "no",
+      "evidence": "caramelized onions, asiago cheese, fresh arugula, reduced balsamic, toasted walnuts, Pecorino Fiore Sardo",
+      "note": "Unlabeled pizza."
+    }
+  ],
+  "notes": "Same dishes as greens-sf-gluten-free; the difference in expected verdicts is the point. No celiac, allergen, or fryer statement on the menu. Dated PDF; PDF parsing is P2."
+}

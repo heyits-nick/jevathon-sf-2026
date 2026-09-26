@@ -1,0 +1,56 @@
+{
+  "label": "DEVELOPMENT/TEST DATA - hand-labeled expected answers, not a live result",
+  "id": "house-of-prime-rib-vegetarian",
+  "restaurant": "House of Prime Rib",
+  "menu_url": "https://houseofprimerib.net/",
+  "diet": "vegetarian",
+  "menu_format": "html",
+  "checked_at": "2026-09-26T13:39:00-07:00",
+  "checked_by": "David Larochelle (with Claude)",
+  "case_type": "clear_fail",
+  "expected_dishes": [
+    {
+      "name": "The City Cut",
+      "verdict": "no",
+      "evidence": "a smaller cut for the lighter appetite.",
+      "note": "Prime rib cut."
+    },
+    {
+      "name": "King Henry VIII Cut",
+      "verdict": "no",
+      "evidence": "extra-generous, thick cut of prime beef, for king size appetites.",
+      "note": "Beef."
+    },
+    {
+      "name": "Creamed Spinach",
+      "verdict": "no",
+      "evidence": "A light dish of garden spinach whipped with fresh cream and pieces of bacon.",
+      "note": "Trap: sounds like a vegetable side but contains bacon."
+    },
+    {
+      "name": "Or Baked Potato",
+      "verdict": "yes",
+      "evidence": "A superior sized Idaho potato served with butter and sour cream, with a sprinkle of chives.",
+      "note": "Dish name appears on the page as 'Or Baked Potato'. Vegetarian ingredients."
+    },
+    {
+      "name": "Mashed Potatoes",
+      "verdict": "unclear",
+      "evidence": "A generous steaming helping of the all American favorite, served with thick brown gravy.",
+      "note": "Gravy base not stated; brown gravy is often meat-based."
+    },
+    {
+      "name": "Yorkshire Pudding",
+      "verdict": "unclear",
+      "evidence": "Light, airy batter baked to a golden brown dome, with a fluffy interior to soak up those savory beef juices.",
+      "note": "Served with beef juices; cooking fat not stated."
+    },
+    {
+      "name": "The Salad Bowl",
+      "verdict": "unclear",
+      "evidence": "A colorful mixture of healthy, crisp, seasonal greens prepared at your table, tossed in our unique house dressing.",
+      "note": "Dressing ingredients not stated."
+    }
+  ],
+  "notes": "Menu is a section of the home page (#menu anchor). Every dinner is a prime rib dinner; sides come with it, so the restaurant overall does not fit a vegetarian."
+}

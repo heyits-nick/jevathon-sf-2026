@@ -1,0 +1,44 @@
+{
+  "label": "DEVELOPMENT/TEST DATA - hand-labeled expected answers, not a live result",
+  "id": "wildseed-sf-gluten-free",
+  "restaurant": "Wildseed (San Francisco)",
+  "menu_url": "https://www.wildseedsf.com/san-francisco-menus/",
+  "diet": "gluten-free",
+  "menu_format": "html",
+  "checked_at": "2026-09-26T13:39:00-07:00",
+  "checked_by": "David Larochelle (with Claude)",
+  "case_type": "ambiguous",
+  "expected_dishes": [
+    {
+      "name": "Kale caesar salad",
+      "verdict": "no",
+      "evidence": "lacinato kale, gem lettuce, farro, levain croutons, coconut parmesan, vegan caesar dressing (cg)",
+      "note": "Marked cg (contains gluten)."
+    },
+    {
+      "name": "Crispy mushroom bao",
+      "verdict": "no",
+      "evidence": "tempura maitake mushroom, cucumber, pickled carrot, sesame cabbage slaw, sriracha, cilantro (cg)",
+      "note": "Marked cg."
+    },
+    {
+      "name": "Spicy cucumbers",
+      "verdict": "unclear",
+      "evidence": "sesame, gochugaru, red onion, avocado, furikake",
+      "note": "No cg mark, but the menu never says unmarked items are gluten-free."
+    },
+    {
+      "name": "Fries",
+      "verdict": "unclear",
+      "evidence": "vegan herb aioli, vegan chipotle aioli, curry ketchup",
+      "note": "No cg mark; fryer and sauces not described."
+    },
+    {
+      "name": "Potato",
+      "verdict": "no",
+      "evidence": "shaved potatoes, castelvetrano olives, rosemary, capers, red onion, chili flakes, extra virgin olive oil, lemon, coconut mozzarella (cg)",
+      "note": "Marked cg as served. The menu offers 'sub gluten free crust', but that is a modification, not the named dish; not tested here."
+    }
+  ],
+  "notes": "Key test: absence of a 'contains gluten' mark is not evidence of gluten-free. Legend: '*cg = contains gluten, hp = high in protein'."
+}

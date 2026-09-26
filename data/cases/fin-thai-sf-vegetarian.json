@@ -1,0 +1,56 @@
+{
+  "label": "DEVELOPMENT/TEST DATA - hand-labeled expected answers, not a live result",
+  "id": "fin-thai-sf-vegetarian",
+  "restaurant": "Fin Thai SF",
+  "menu_url": "https://finthaisf.com/san-francisco-fin-thai-sf-food-menu",
+  "diet": "vegetarian",
+  "menu_format": "html",
+  "checked_at": "2026-09-26T13:39:00-07:00",
+  "checked_by": "David Larochelle (with Claude)",
+  "case_type": "ambiguous",
+  "expected_dishes": [
+    {
+      "name": "Fresh Rolls (V)",
+      "verdict": "yes",
+      "evidence": "Tofu, iceberg lettuce, cucumber, carrot, vermicelli, mint, rice paper wrapped served with peanut sauce",
+      "note": "Marked (V); ingredients are vegetarian."
+    },
+    {
+      "name": "Spring Rolls (V)",
+      "verdict": "yes",
+      "evidence": "Deep - fried rice paper wrapped with carrot, cabbage, mushroom and silver noodles served with sweet chili sauce",
+      "note": "Marked (V)."
+    },
+    {
+      "name": "Green Bean Tofu",
+      "verdict": "no",
+      "evidence": "Fried tofu, Green Bean, Red curry paste, Thai shrimp paste",
+      "note": "Trap: tofu dish with shrimp paste."
+    },
+    {
+      "name": "Cabbage Wok Fried",
+      "verdict": "no",
+      "evidence": "Green cabbage, garlic, dried shrimp and fish sauce",
+      "note": "Trap: listed under VEGETABLES but has shrimp and fish sauce."
+    },
+    {
+      "name": "Red Curry",
+      "verdict": "unclear",
+      "evidence": "Red curry paste, Eggplant, Basil, Carrot, Bell pepper. Served with Jasmine Rice or Roti Bread",
+      "note": "No protein listed; Thai red curry paste often contains shrimp paste and the menu does not say."
+    },
+    {
+      "name": "Pad Thai",
+      "verdict": "unclear",
+      "evidence": "Stir fried small rice noodle, fried tofu, egg, ground peanut, bean sprout",
+      "note": "Egg is vegetarian, but sauce (commonly fish sauce) is not listed."
+    },
+    {
+      "name": "Egg Plant Basil Tofu",
+      "verdict": "unclear",
+      "evidence": "Fried tofu, Egg plant, Basil, Bell pepper, Chili, Garlic, Black soy sauce",
+      "note": "All listed ingredients fit, but not marked (V) and stir-fry sauces may include fish or oyster sauce."
+    }
+  ],
+  "notes": "(V) is not defined on the page. Good test that 'tofu' or a VEGETABLES heading does not imply vegetarian."
+}

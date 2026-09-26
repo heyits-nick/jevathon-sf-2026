@@ -1,0 +1,44 @@
+{
+  "label": "DEVELOPMENT/TEST DATA - hand-labeled expected answers, not a live result",
+  "id": "kitava-mission-celiac",
+  "restaurant": "Kitava (Mission District)",
+  "menu_url": "https://www.kitava.com/kitava-mission-district-menus/",
+  "diet": "celiac",
+  "menu_format": "html",
+  "checked_at": "2026-09-26T13:52:00-07:00",
+  "checked_by": "David Larochelle (with Claude)",
+  "case_type": "ambiguous",
+  "expected_dishes": [
+    {
+      "name": "Chicken Nuggets",
+      "verdict": "unclear",
+      "evidence": "Cassava flour breaded chicken, served with house made ketchup",
+      "note": "Cassava flour breading, and the menu says it is gluten-free, but it gives no cross-contact information."
+    },
+    {
+      "name": "Sesame Chicken Bowl",
+      "verdict": "unclear",
+      "evidence": "Jasmine rice, crispy chicken with cassava flour breading, charred broccoli, sesame togarashi, scallions, ginger ponzu sauce",
+      "note": "Trap: ponzu is usually wheat soy sauce; the menu says 100% free of gluten and soy, but gives no cross-contact information."
+    },
+    {
+      "name": "Evolved Caesar Salad",
+      "verdict": "unclear",
+      "evidence": "Farmer’s greens, sliced radish, pastured egg, avocado, gluten-free croutons, cashew “parmesan,\" herb ranch dressing",
+      "note": "Croutons are labeled gluten-free, but there is no cross-contact information."
+    },
+    {
+      "name": "Dark Chocolate Brownie",
+      "verdict": "unclear",
+      "evidence": "Rich and fudgy brownie made with cassava and coconut flour, pastured eggs, and coconut sugar",
+      "note": "Gluten-free flours, but no cross-contact information."
+    },
+    {
+      "name": "Chocolate Chip Cookie",
+      "verdict": "unclear",
+      "evidence": "Dark chocolate chip cookie made with GF flour mix, egg, vanilla, and dark chocolate sweetened with coconut sugar. Contains almonds and eggs.",
+      "note": "GF flour mix, but no cross-contact information."
+    }
+  ],
+  "notes": "The page states 'Our Menu 100% free of gluten, dairy, soy, peanuts, refined sugar & seed oils.' That is an ingredient claim, not a statement about a dedicated kitchen, dedicated fryer, or celiac-safe handling, so the dishes are unclear for celiac (they are yes in kitava-mission-gluten-free). The oat-based Plant Protein Patty is left out on purpose because oats are contested for celiac."
+}
