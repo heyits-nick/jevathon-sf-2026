@@ -78,4 +78,10 @@ folder to avoid merge conflicts.
 
 ## Setup and demo
 
-To be filled in as components land.
+Provider adapters use Node 25, with credentials in an ignored root `.env`.
+Copy variable names from `.env.example`, then follow the
+[integration runbook](docs/integration-runbook.md) for Browserbase, Photon,
+and ElevenLabs setup, backend hookup, and live verification.
+
+The trip backend URL goes in `API_BASE_URL`. Provider adapters do not replace
+the backend: Jev decisions and persisted trip state remain there.
