@@ -69,7 +69,7 @@ the live page with `validate.py --live`.
 | [fin-thai-sf-gluten-free](cases/fin-thai-sf-gluten-free.json) | gluten-free | ambiguous | No labels; bread in a dessert, soy sauce, rice noodles with unlisted sauce |
 | [house-of-prime-rib-gluten-free](cases/house-of-prime-rib-gluten-free.json) | gluten-free | ambiguous | Yorkshire pudding, gravy, creamed spinach; meat is not automatically gluten-free |
 | [kitava-mission-gluten-free](cases/kitava-mission-gluten-free.json) | gluten-free | clear_pass | "100% free of gluten" kitchen; breaded nuggets, ponzu, croutons that are all gluten-free |
-| [kitava-mission-celiac](cases/kitava-mission-celiac.json) | celiac | clear_pass | Same dishes; the kitchen-wide statement satisfies the celiac rule |
+| [kitava-mission-celiac](cases/kitava-mission-celiac.json) | celiac | ambiguous | Same dishes; "100% free of gluten" is an ingredient claim with no cross-contact statement, so unclear |
 | [greens-sf-celiac](cases/greens-sf-celiac.json) | celiac | ambiguous | Same dishes as greens-sf-gluten-free; gf labels become unclear without fryer or kitchen information |
 | [wildseed-sf-celiac](cases/wildseed-sf-celiac.json) | celiac | ambiguous | Gluten-free crust baked with wheat pizzas; fries near tempura with no fryer statement |
 

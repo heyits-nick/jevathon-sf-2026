@@ -23,6 +23,7 @@ REQUIRED = ["label", "id", "restaurant", "menu_url", "diet", "menu_format",
 VERDICTS = {"yes", "no", "unclear"}
 CASE_TYPES = {"clear_pass", "clear_fail", "ambiguous"}
 FORMATS = {"html", "pdf", "image"}
+DIETS = {"vegan", "vegetarian", "gluten-free", "celiac"}
 
 
 def norm(s):
@@ -48,7 +49,7 @@ def page_text(url, fmt):
 
 def check(path, live):
     errors = []
-    c = json.loads(path.read_text())
+    c = json.loads(path.read_text(encoding="utf-8"))
     missing = [k for k in REQUIRED if k not in c]
     if missing:
         return [f"missing fields: {missing}"]
@@ -58,15 +59,19 @@ def check(path, live):
         errors.append(f"id {c['id']!r} does not match file name")
     if c["case_type"] not in CASE_TYPES:
         errors.append(f"bad case_type {c['case_type']!r}")
+    if c["diet"] not in DIETS:
+        errors.append(f"bad diet {c['diet']!r}")
     if c["menu_format"] not in FORMATS:
         errors.append(f"bad menu_format {c['menu_format']!r}")
-    if not c["expected_dishes"]:
-        errors.append("no expected_dishes")
-    for d in c["expected_dishes"]:
+    if not isinstance(c["expected_dishes"], list) or not c["expected_dishes"]:
+        return errors + ["expected_dishes must be a nonempty list"]
+    for i, d in enumerate(c["expected_dishes"]):
+        if not isinstance(d, dict) or not all(
+                isinstance(d.get(k), str) and d[k].strip() for k in ("name", "evidence")):
+            errors.append(f"dish {i}: must be an object with nonempty name and evidence")
+            continue
         if d.get("verdict") not in VERDICTS:
-            errors.append(f"{d.get('name')}: bad verdict {d.get('verdict')!r}")
-        if not d.get("evidence"):
-            errors.append(f"{d.get('name')}: no evidence quote")
+            errors.append(f"{d['name']}: bad verdict {d.get('verdict')!r}")
     if live and not errors:
         try:
             text = norm(page_text(c["menu_url"], c["menu_format"]))

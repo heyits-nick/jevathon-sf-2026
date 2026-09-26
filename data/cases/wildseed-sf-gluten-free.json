@@ -35,9 +35,9 @@
     },
     {
       "name": "Potato",
-      "verdict": "unclear",
+      "verdict": "no",
       "evidence": "shaved potatoes, castelvetrano olives, rosemary, capers, red onion, chili flakes, extra virgin olive oil, lemon, coconut mozzarella (cg)",
-      "note": "Pizza marked cg, but the menu offers 'sub gluten free crust $3'. Without the substitution it is no; with it, cross-contact is unknown."
+      "note": "Marked cg as served. The menu offers 'sub gluten free crust', but that is a modification, not the named dish; not tested here."
     }
   ],
   "notes": "Key test: absence of a 'contains gluten' mark is not evidence of gluten-free. Legend: '*cg = contains gluten, hp = high in protein'."

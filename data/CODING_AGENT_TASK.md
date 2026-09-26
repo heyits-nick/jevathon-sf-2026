@@ -46,6 +46,8 @@ back as a confident `yes`.**
    `{"error": {"code", "message", "retryable"}}`. Report the code. A `422` with
    `NO_MENU_EVIDENCE` is an acceptable result for a `menu_format` of `pdf` or
    `image`. A timeout or `5xx` is reported as `PROVIDER_FAILURE`, not a pass.
+   Every other error response is a **FAIL**. `PROVIDER_FAILURE` also makes the
+   run exit nonzero.
 3. If the response succeeds, check that it has the contract fields
    `restaurant, diet, score, confidence, escalated, before_escalation, dishes,
    timing_ms` and that each dish has `name, verdict, confidence, source`.
@@ -59,8 +61,8 @@ back as a confident `yes`.**
    - Report expected dishes that were not returned as `MISSING` (warning).
 5. If a response returns `verdict: "yes"` for a dish whose confidence is below
    `YES_MIN_CONFIDENCE`, also WARN: the UI must not show that as a yes.
-6. Print a table per case and a summary line. Exit 1 on any FAIL or on a
-   contract-shape error, otherwise 0.
+6. Print a table per case and a summary line. Exit 1 on any FAIL,
+   `PROVIDER_FAILURE`, or contract-shape error, otherwise 0.
 
 **Also add** a short "Running against the backend" section to
 `data/README.md` with the command, the variables, and what FAIL versus WARN
