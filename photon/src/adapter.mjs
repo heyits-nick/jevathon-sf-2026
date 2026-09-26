@@ -21,7 +21,8 @@ export function openState(path) {
 }
 
 function sourceUrl(text) {
-  const candidate = text.match(/https?:\/\/[^\s<>"']+/i)?.[0]?.replace(/[),.!?]+$/, '');
+  const candidate = text.match(/https?:\/\/\s*[^\s<>"']+/i)?.[0]
+    ?.replace(/^(https?:\/\/)\s+/i, '$1').replace(/[),.!?]+$/, '');
   if (!candidate) return undefined;
   try {
     const url = new URL(candidate);

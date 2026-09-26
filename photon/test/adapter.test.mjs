@@ -128,6 +128,20 @@ test('recovery sends a persisted reply without repeating backend research', asyn
   } finally { db.close(); }
 });
 
+test('normalizes whitespace after a shared URL scheme without changing message text', async () => {
+  const db = openState(':memory:');
+  const text = 'DUMBO, vegetarian lunch — https:// www.lullanyc.com/menu/all-day/.';
+  const seen = [];
+  try {
+    await handleMessage(db, incoming('wrapped-link', 'presenter', text), {
+      createTrip: async () => ({ trip_id: 'trip', access_token: 'token' }),
+      sendMessage: async (_id, _token, body) => { seen.push(body); return { reply: 'saved' }; },
+    });
+    assert.equal(seen[0].text, text);
+    assert.equal(seen[0].source_url, 'https://www.lullanyc.com/menu/all-day/');
+  } finally { db.close(); }
+});
+
 test('recovery rotates past 100 repeatedly failing rows and migrates old state', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'photon-old-state-'));
   const path = join(dir, 'state.sqlite');
