@@ -220,3 +220,21 @@ def post_message(
     session.commit()
 
     return PostMessageResponse(trip=_serialize_trip(trip, session), reply=reply_text)
+
+
+# --- Minimal Jev dish-fit check (narrow endpoint; full POST /score is pending) ---
+from pydantic import BaseModel as _BaseModel  # noqa: E402
+
+from . import jev  # noqa: E402
+
+
+class DishFitRequest(_BaseModel):
+    dish: str
+    description: str = ""
+    diet: str
+
+
+@app.post("/jev/dish-fit")
+def jev_dish_fit(body: DishFitRequest):
+    result = jev.dish_fit(body.dish, body.description, body.diet)
+    return JSONResponse(status_code=200 if result["status"] == "ok" else 502, content=result)
