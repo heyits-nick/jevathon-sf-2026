@@ -5,7 +5,11 @@ export const formatMs = (ms: number) =>
 
 /** Keeps sub-cent costs readable, e.g. $0.00012. */
 export const formatUsd = (usd: number) =>
-  usd >= 0.01 ? `$${usd.toFixed(2)}` : `$${usd.toPrecision(2).replace(/0+$/, "")}`;
+  usd === 0
+    ? "$0.00"
+    : usd >= 0.01
+      ? `$${usd.toFixed(2)}`
+      : `$${usd.toPrecision(2).replace(/\.?0+$/, "")}`;
 
 const timeFormatter = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
 
