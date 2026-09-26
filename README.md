@@ -24,12 +24,12 @@ text) and score again.
 restaurant + diet
       │
       ▼
-Browserbase ── fetch menu page ──► split into dishes
+Browserbase ── fetch menu text ──► scorer: split into dishes
                                         │
                                         ▼
                          Jev: fits diet? (yes/no/unclear + confidence)
                                         │
-                        restaurant score low-confidence?
+                   many unclear dishes or low confidence?
                            │ no                 │ yes
                            ▼                    ▼
                         results        Browserbase: reviews / HappyCow
