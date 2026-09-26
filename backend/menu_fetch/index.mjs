@@ -17,8 +17,8 @@ function publicAddress(address) {
     if (a.includes('ffff:')) return false;
     return /^[23]/.test(a) && !a.startsWith('2001:db8:');
   }
-  const [a, b] = address.split('.').map(Number);
-  return !(a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && (b === 0 || b === 168)) || (a === 198 && (b === 18 || b === 19)) || (a === 100 && b >= 64 && b <= 127));
+  const [a, b, c] = address.split('.').map(Number);
+  return !(a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && (b === 168 || (b === 0 && (c === 0 || c === 2)))) || (a === 198 && (b === 18 || b === 19 || (b === 51 && c === 100))) || (a === 203 && b === 0 && c === 113) || (a === 100 && b >= 64 && b <= 127));
 }
 
 export async function validatePublicUrl(value, resolve = lookup) {
@@ -71,9 +71,9 @@ export function parseMenuText(rawText, url, kind = 'menu', checkedAt = new Date(
   return { raw_text, dishes, evidence };
 }
 
-export async function fetchMenu(inputUrl, { restaurant, kind = 'menu', client, timeoutMs = 20000 } = {}) {
+export async function fetchMenu(inputUrl, { restaurant, kind = 'menu', client, resolve = lookup, timeoutMs = 20000 } = {}) {
   if (!['menu', 'review', 'diet_site'].includes(kind)) throw new MenuFetchError('INVALID_KIND', 'Unsupported evidence kind.');
-  const menu_url = await validatePublicUrl(inputUrl);
+  const menu_url = await validatePublicUrl(inputUrl, resolve);
   if (!client && !process.env.BROWSERBASE_API_KEY) throw new MenuFetchError('NOT_CONFIGURED', 'Browserbase is not configured.', true);
   const started = performance.now();
   try {
