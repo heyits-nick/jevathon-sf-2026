@@ -87,7 +87,7 @@ export function JevTrace({
           <dl className="jev-trace-stats">
             <Stat label="Calls" value={String(ordered.length)} />
             <Stat label="Jev time" value={formatMs(totalMs)} />
-            <Stat label="Cost" value={costUsd === undefined ? "Not reported" : formatUsd(costUsd)} />
+            <Stat label="Cost" value={costUsd == null ? "Not reported" : formatUsd(costUsd)} />
             <Stat label="Model" value={models[0] ?? "Not reported"} />
           </dl>
 

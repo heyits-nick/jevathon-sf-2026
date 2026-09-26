@@ -13,7 +13,7 @@ export function TimingStats({ result, roundTripMs }: TimingStatsProps) {
 
   const stats = [
     { label: "Jev per dish", value: avgJevMs === undefined ? undefined : formatMs(avgJevMs), highlight: true },
-    { label: "Jev cost", value: jev_cost_usd === undefined ? undefined : formatUsd(jev_cost_usd), highlight: true },
+    { label: "Jev cost", value: jev_cost_usd == null ? undefined : formatUsd(jev_cost_usd), highlight: true },
     { label: "Menu fetch", value: formatMs(timing_ms.fetch) },
     { label: "Round trip", value: roundTripMs === undefined ? undefined : formatMs(roundTripMs) },
   ];
