@@ -1,8 +1,9 @@
 # Event reference
 
-Summary of the official pages as of 12:55 PM on 2026-09-26. The official pages
-win if anything here disagrees. Coupon and invite codes are on the Notion page;
-they are not copied here.
+Summary of the official pages as of 12:55 PM on 2026-09-26, with the subsequent
+organizer extension to **3:00 PM PT** reported by Nikhil. That extension replaces
+the earlier 2:30 PM cutoff for this team's schedule. Other event details remain
+as published. Coupon and invite codes are on the Notion page; they are not copied here.
 
 ## Links
 
@@ -24,8 +25,8 @@ they are not copied here.
 | Time | What |
 |---|---|
 | 11:30 AM | Hacking begins |
-| **2:30 PM** | **Hard stop.** Team registered and project submitted on HackerSquad under `./project.sh` |
-| 2:30 PM | Demos and live judging |
+| **3:00 PM** | **Extended hard stop.** Team registered and project submitted on HackerSquad under `./project.sh`; team target 2:55 PM |
+| After hacking | Demos and live judging; follow the updated on-site announcement |
 | 3:30 PM | Awards |
 | 4:00–8:00 PM | Rooftop afterparty |
 
@@ -69,12 +70,12 @@ steps are on the Notion page.
 
 | Tool | What it does | Our use |
 |---|---|---|
-| **Jev (TypeSafe AI)** | Fast typed decisions with confidence scores, not text generation | Per-dish diet verdicts; required for main track |
+| **Jev (TypeSafe AI)** | Typed decisions with confidence scores, not text generation | All AI semantic decisions; required for main track |
 | **Browserbase** (+ Stagehand) | Headless browsers for agents | Fetch menus and reviews |
 | **Photon** | Connects agents to iMessage, WhatsApp | P1 chat interface |
 | **CodeRabbit** | AI PR review and Coding Agent | Review every PR |
 | **GMI Cloud** | GPU inference, models via API or MCP | Optional LLM for summaries |
 | **LlamaIndex** | RAG, LlamaParse document parsing | Possible PDF menu parsing (P2) |
-| **ElevenLabs** | Voice (TTS, STT, voice agents) | Not planned |
+| **ElevenLabs** | Voice (TTS, STT, voice agents) | Voice recall through the shared trip backend |
 | **Cognition** | Devin, Windsurf | Optional coding help |
 | **Whop** | Digital product and membership platform | Not planned |

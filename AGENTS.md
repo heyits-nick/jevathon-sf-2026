@@ -5,8 +5,9 @@ Coding Agent, Cursor, Windsurf, and others) working in this repository.
 
 ## Context
 
-This is a one-day hackathon project. Hacking ends at **2:30 PM PT on
-2026-09-26**. Working code beats polish. Read [README.md](README.md) for the
+This is a one-day hackathon project. Hacking ends at **3:00 PM PT on
+2026-09-26**, following the organizer extension reported by Nikhil. Submit by
+2:55 PM. Working code beats polish. Read [README.md](README.md) for the
 idea and [docs/roadmap.md](docs/roadmap.md) for current priorities before
 starting work.
 
@@ -35,10 +36,23 @@ starting work.
 Jev (TypeSafe AI) returns typed values with confidence scores, not free text.
 Use it for decisions (classify, score, route). Use a generative LLM only where
 text must be written, such as a summary line, and only after Jev has decided.
+All AI semantic decisions belong to Jev, including intent, ambiguity, evidence
+escalation, recommendation selection, and memory recall. Extraction models
+may propose facts/candidates but cannot select the next action or recommendation.
+Code still enforces validation, permissions, user confirmation, bounded execution,
+and numeric calculations. Explicit human choices are not overridden by Jev.
+If Jev is unavailable, preserve the input and report the failure; do not replace
+it with heuristic or generative-model decisions.
 Check the Jev console docs for the exact question format before writing code
 against it.
 
 ## Definition of done for a task
+
+Read your role's document under [docs/handoffs/](docs/handoffs/README.md).
+The API contract in `docs/architecture.md` is canonical. Preserve `POST /score`
+while adding the shared saved-trip flow. Owner changes and contract changes
+must be named in the PR description. Regular small PRs, peer review, and merges
+are required; do not push directly to `main`.
 
 - It runs end to end against real services.
 - `README.md` setup section says how to run it.
