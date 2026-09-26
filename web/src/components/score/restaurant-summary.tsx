@@ -6,7 +6,7 @@ import { getVerdictDisplay, scoreTone, TONE_TEXT } from "@/lib/score/verdict";
 import { formatPercent } from "@/lib/format";
 import type { ScoreResponse } from "@/lib/api/types";
 
-export function RestaurantSummary({ result }: { result: ScoreResponse }) {
+export function RestaurantSummary({ result, showName = true }: { result: ScoreResponse; showName?: boolean }) {
   const counts = countDishes(result);
 
   return (
@@ -21,7 +21,7 @@ export function RestaurantSummary({ result }: { result: ScoreResponse }) {
             </Badge>
           )}
         </div>
-        <h2 className="text-2xl font-semibold tracking-tight">{result.restaurant}</h2>
+        {showName && <h2 className="text-2xl font-semibold tracking-tight">{result.restaurant}</h2>}
         <p className="text-sm text-muted-foreground">
           <Count value={counts.fits} label="fit" tone="text-success" /> ·{" "}
           <Count value={counts.uncertain} label="uncertain" tone="text-warning" /> ·{" "}
