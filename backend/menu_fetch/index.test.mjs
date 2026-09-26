@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fetchMenu, parseMenuText, validatePublicUrl } from './index.mjs';
+import { fetchMenu, parseMenuText, searchSources, validatePublicUrl } from './index.mjs';
 
 test('rejects private and malformed sources', async () => {
   for (const url of ['file:///etc/passwd', 'http://127.0.0.1/menu', 'http://localhost/menu', 'https://user:pass@example.com/menu', 'https://192.168.1.1/menu', 'http://[::ffff:127.0.0.1]/menu', 'http://[ff02::1]/menu']) {
@@ -32,4 +32,23 @@ test('provider failure is safe and redirect is blocked', async () => {
   await assert.rejects(fetchMenu('https://example.com/menu', { client, resolve }), e => e.code === 'PROVIDER_FAILURE' && !e.message.includes('secret'));
   client.fetchAPI.create = async () => ({ statusCode: 302 });
   await assert.rejects(fetchMenu('https://example.com/menu', { client, resolve }), e => e.code === 'REDIRECT_BLOCKED');
+});
+
+test('search is bounded and hides provider failures', async () => {
+  await assert.rejects(searchSources('menu', { limit: 6, apiKey: 'test' }), e => e.code === 'INVALID_SEARCH');
+  const request = async (_url, options) => {
+    assert.equal(JSON.parse(options.body).numResults, 3);
+    return { ok: true, json: async () => ({ query: 'menu', results: [
+      { id: 'a', title: 'Menu A', url: 'https://example.com/a' },
+      { id: 'unsafe', title: 'Unsafe', url: 'https://user:pass@example.com/private' },
+      { id: 'b', title: 'Menu B', url: 'https://example.com/b', snippet: 'Observed excerpt' },
+      { id: 'c', title: 'Menu C', url: 'https://example.com/c' },
+    ] }) };
+  };
+  const result = await searchSources('menu', { limit: 3, apiKey: 'test', request });
+  assert.equal(result.results.length, 2);
+  assert.deepEqual(result.results.map(r => r.id), ['a', 'b']);
+  assert.equal(result.results[0].snippet, null);
+  assert.equal(result.results[1].snippet, 'Observed excerpt');
+  await assert.rejects(searchSources('menu', { apiKey: 'test', request: async () => { throw new Error('secret provider body'); } }), e => e.code === 'SEARCH_PROVIDER_FAILURE' && !e.message.includes('secret'));
 });

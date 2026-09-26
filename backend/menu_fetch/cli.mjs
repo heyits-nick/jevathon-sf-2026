@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { fetchMenu, MenuFetchError } from './index.mjs';
+import { fetchMenu, searchSources, MenuFetchError } from './index.mjs';
 
 function errorBody(error) {
   return { error: { code: error instanceof MenuFetchError ? error.code : 'INTERNAL_ERROR', message: error instanceof MenuFetchError ? error.message : 'Menu fetch failed.', retryable: error instanceof MenuFetchError && error.retryable } };
@@ -11,7 +11,7 @@ async function serve() {
   if (!['localhost', '127.0.0.1', '::1'].includes(host) && !token) throw new Error('MENU_FETCH_TOKEN is required for a nonlocal host.');
   const server = createServer(async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
-    if (req.method !== 'POST' || req.url !== '/fetch-menu') { res.writeHead(404); res.end(JSON.stringify(errorBody(new MenuFetchError('NOT_FOUND', 'Route not found.')))); return; }
+    if (req.method !== 'POST' || !['/fetch-menu', '/search-sources'].includes(req.url)) { res.writeHead(404); res.end(JSON.stringify(errorBody(new MenuFetchError('NOT_FOUND', 'Route not found.')))); return; }
     if (token && req.headers.authorization !== `Bearer ${token}`) { res.writeHead(401); res.end(JSON.stringify(errorBody(new MenuFetchError('UNAUTHORIZED', 'Missing or invalid token.')))); return; }
     try {
       const chunks = [];
@@ -22,12 +22,15 @@ async function serve() {
         chunks.push(chunk);
       }
       const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-      const result = await fetchMenu(body.menu_url, { restaurant: body.restaurant, kind: body.kind });
+      const result = req.url === '/search-sources'
+        ? await searchSources(body.query, { limit: body.limit })
+        : await fetchMenu(body.menu_url, { restaurant: body.restaurant, kind: body.kind });
       res.writeHead(200); res.end(JSON.stringify(result));
     } catch (error) {
-      const status = error instanceof SyntaxError || ['INVALID_URL', 'INVALID_KIND', 'PRIVATE_URL', 'INVALID_REQUEST'].includes(error.code) ? 400
+      const status = error instanceof SyntaxError || ['INVALID_URL', 'INVALID_KIND', 'INVALID_SEARCH', 'PRIVATE_URL', 'INVALID_REQUEST'].includes(error.code) ? 400
         : error.code === 'NO_MENU_EVIDENCE' || error.code === 'UNSUPPORTED_SOURCE' ? 422
-        : error.code === 'PROVIDER_FAILURE' || error.code === 'SOURCE_FAILED' ? 502 : 500;
+        : error.code === 'NOT_CONFIGURED' ? 503
+        : ['PROVIDER_FAILURE', 'SEARCH_PROVIDER_FAILURE', 'SOURCE_FAILED'].includes(error.code) ? 502 : 500;
       res.writeHead(status); res.end(JSON.stringify(errorBody(error)));
     }
   });
