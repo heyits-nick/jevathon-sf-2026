@@ -27,14 +27,23 @@ export function useTrip() {
   const [lastReply, setLastReply] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingMessage | null>(null);
   const [creating, setCreating] = useState<{ error?: string } | null>(null);
+  const [pollTick, setPollTick] = useState(0);
   const pollCount = useRef(0);
+  // Bumped on every getTrip start and on startOver; an older getTrip response is ignored.
+  const requestGeneration = useRef(0);
+  // Bumped on startOver; a message sent under an earlier session cannot update the new one.
+  const sessionGeneration = useRef(0);
 
   const fetchTrip = useCallback(async (s: TripSession) => {
+    const generation = ++requestGeneration.current;
     setLoad({ status: "loading" });
     try {
-      setTrip(await api.getTrip(s.tripId, s.token));
+      const next = await api.getTrip(s.tripId, s.token);
+      if (generation !== requestGeneration.current) return;
+      setTrip(next);
       setLoad({ status: "ready" });
     } catch (err) {
+      if (generation !== requestGeneration.current) return;
       if (err instanceof ApiError && (err.status === 401 || err.status === 403 || err.status === 404)) {
         clearTripSession();
         setSession(null);
@@ -67,14 +76,17 @@ export function useTrip() {
     if (pollCount.current >= MAX_POLLS) return;
     const id = setTimeout(async () => {
       pollCount.current += 1;
+      const generation = ++requestGeneration.current;
       try {
-        setTrip(await api.getTrip(session.tripId, session.token));
+        const next = await api.getTrip(session.tripId, session.token);
+        if (generation === requestGeneration.current) setTrip(next);
       } catch {
-        // A failed poll leaves the last known trip visible; the refresh button remains available.
+        // Keep the last known trip visible and schedule the next poll; failures still count toward MAX_POLLS.
+        if (generation === requestGeneration.current) setPollTick((n) => n + 1);
       }
     }, POLL_INTERVAL_MS);
     return () => clearTimeout(id);
-  }, [trip, session]);
+  }, [trip, session, pollTick]);
 
   const createTrip = useCallback(
     async (req: CreateTripRequest) => {
@@ -96,18 +108,21 @@ export function useTrip() {
   const deliver = useCallback(
     async (message: PendingMessage) => {
       if (!session) return false;
+      const generation = sessionGeneration.current;
       setPending({ ...message, status: "sending", error: undefined });
       try {
         const res = await api.sendMessage(session.tripId, session.token, {
           client_message_id: message.id,
           ...message.payload,
         });
+        if (generation !== sessionGeneration.current) return false;
         setTrip(res.trip);
         setLastReply(res.reply);
         setPending(null);
         pollCount.current = 0;
         return true;
       } catch (err) {
+        if (generation !== sessionGeneration.current) return false;
         setPending({ ...message, status: "failed", error: errorMessage(err) });
         return false;
       }
@@ -124,6 +139,8 @@ export function useTrip() {
   const retryMessage = useCallback(() => (pending ? deliver(pending) : Promise.resolve(false)), [pending, deliver]);
 
   const startOver = useCallback(() => {
+    requestGeneration.current += 1;
+    sessionGeneration.current += 1;
     clearTripSession();
     setSession(null);
     setTrip(null);
