@@ -57,11 +57,11 @@ def check(path, live):
         errors.append("label changed")
     if c["id"] != path.stem:
         errors.append(f"id {c['id']!r} does not match file name")
-    if c["case_type"] not in CASE_TYPES:
+    if not isinstance(c["case_type"], str) or c["case_type"] not in CASE_TYPES:
         errors.append(f"bad case_type {c['case_type']!r}")
-    if c["diet"] not in DIETS:
+    if not isinstance(c["diet"], str) or c["diet"] not in DIETS:
         errors.append(f"bad diet {c['diet']!r}")
-    if c["menu_format"] not in FORMATS:
+    if not isinstance(c["menu_format"], str) or c["menu_format"] not in FORMATS:
         errors.append(f"bad menu_format {c['menu_format']!r}")
     if not isinstance(c["expected_dishes"], list) or not c["expected_dishes"]:
         return errors + ["expected_dishes must be a nonempty list"]
