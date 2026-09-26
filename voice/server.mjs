@@ -6,9 +6,20 @@ const demoPath = fileURLToPath(new URL('./demo.html', import.meta.url));
 const clientPath = fileURLToPath(new URL('./voice-client.mjs', import.meta.url));
 const error = (code, message, retryable = false) => ({ error: { code, message, retryable } });
 
+function safeApiBase(value) {
+  try {
+    const url = new URL(value);
+    const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    if ((url.protocol !== 'https:' && !(url.protocol === 'http:' && local)) ||
+        url.username || url.password || url.search || url.hash) return null;
+    return url.href.replace(/\/$/, '');
+  } catch { return null; }
+}
+
 export function createServer({ apiBase = process.env.API_BASE_URL, apiKey = process.env.ELEVENLABS_API_KEY,
   agentId = process.env.ELEVENLABS_AGENT_ID, allowedOrigin = process.env.VOICE_ALLOWED_ORIGIN,
   fetchImpl = fetch } = {}) {
+  const backendBase = safeApiBase(apiBase);
   return http.createServer(async (req, res) => {
     const origin = req.headers.origin;
     if (origin && allowedOrigin && origin === allowedOrigin) {
@@ -29,10 +40,10 @@ export function createServer({ apiBase = process.env.API_BASE_URL, apiKey = proc
     const [, tripId, action] = match;
     const auth = req.headers.authorization;
     if (!/^Bearer [^\s]{8,}$/.test(auth || '')) return send(res, 401, error('UNAUTHORIZED', 'Trip access token required'));
-    if (!apiBase) return send(res, 503, error('NOT_CONFIGURED', 'Trip API is unavailable', true));
+    if (!backendBase) return send(res, 503, error('NOT_CONFIGURED', 'Trip API is unavailable', true));
     try {
       // Every action rechecks the backend token. The model's trip_id is never an identity source.
-      const tripResponse = await fetchImpl(`${apiBase.replace(/\/$/, '')}/trips/${encodeURIComponent(tripId)}`, {
+      const tripResponse = await fetchImpl(`${backendBase}/trips/${encodeURIComponent(tripId)}`, {
         headers: { Authorization: auth }, signal: AbortSignal.timeout(10000)
       });
       if (!tripResponse.ok) return send(res, tripResponse.status === 401 || tripResponse.status === 403 || tripResponse.status === 404 ? tripResponse.status : 502,
@@ -57,7 +68,7 @@ export function createServer({ apiBase = process.env.API_BASE_URL, apiKey = proc
           typeof body.client_message_id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(body.client_message_id)) {
         return send(res, 400, error('INVALID_MESSAGE', 'A valid trip ID, message ID, and text are required'));
       }
-      const response = await fetchImpl(`${apiBase.replace(/\/$/, '')}/trips/${encodeURIComponent(tripId)}/messages`, {
+      const response = await fetchImpl(`${backendBase}/trips/${encodeURIComponent(tripId)}/messages`, {
         method: 'POST', headers: { Authorization: auth, 'Content-Type': 'application/json' },
         body: JSON.stringify({ client_message_id: body.client_message_id, text: body.text }), signal: AbortSignal.timeout(50000)
       });
