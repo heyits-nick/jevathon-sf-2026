@@ -7,6 +7,10 @@ test('rejects private and malformed sources', async () => {
     await assert.rejects(validatePublicUrl(url));
   }
   await assert.rejects(validatePublicUrl('https://restaurant.example/menu', async () => [{ address: '10.1.2.3' }]));
+  for (const address of ['192.0.2.1', '198.51.100.5', '203.0.113.9']) {
+    await assert.rejects(validatePublicUrl(`http://${address}/menu`));
+  }
+  assert.equal(await validatePublicUrl('http://192.0.78.9/menu'), 'http://192.0.78.9/menu');
 });
 
 test('priced lines produce source-matched dish evidence; empty text does not', () => {
@@ -23,8 +27,9 @@ test('priced lines produce source-matched dish evidence; empty text does not', (
 });
 
 test('provider failure is safe and redirect is blocked', async () => {
+  const resolve = async () => [{ address: '93.184.215.14' }];
   const client = { fetchAPI: { create: async () => { throw new Error('secret provider body'); } } };
-  await assert.rejects(fetchMenu('https://example.com/menu', { client }), e => e.code === 'PROVIDER_FAILURE' && !e.message.includes('secret'));
+  await assert.rejects(fetchMenu('https://example.com/menu', { client, resolve }), e => e.code === 'PROVIDER_FAILURE' && !e.message.includes('secret'));
   client.fetchAPI.create = async () => ({ statusCode: 302 });
-  await assert.rejects(fetchMenu('https://example.com/menu', { client }), e => e.code === 'REDIRECT_BLOCKED');
+  await assert.rejects(fetchMenu('https://example.com/menu', { client, resolve }), e => e.code === 'REDIRECT_BLOCKED');
 });

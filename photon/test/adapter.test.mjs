@@ -128,6 +128,35 @@ test('recovery sends a persisted reply without repeating backend research', asyn
   } finally { db.close(); }
 });
 
+test('recovery rotates past 100 repeatedly failing rows and migrates old state', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'photon-old-state-'));
+  const path = join(dir, 'state.sqlite');
+  let state = openState(path);
+  try {
+    state.exec('ALTER TABLE deliveries DROP COLUMN recovery_attempts');
+    state.close();
+    state = openState(path);
+    assert.ok(state.prepare('PRAGMA table_info(deliveries)').all().some(column => column.name === 'recovery_attempts'));
+    const insert = state.prepare('INSERT INTO deliveries (provider_key, scope, text) VALUES (?, ?, ?)');
+    for (let i = 0; i < 101; i++) insert.run(`key-${i}`, JSON.stringify(['imessage', 'space', 'sender']), `text-${i}`);
+    const backend = {
+      createTrip: async () => ({ trip_id: 'trip', access_token: 'token' }),
+      sendMessage: async (_trip, _token, body) => {
+        if (body.text === 'text-100') return { reply: 'Recovered final row' };
+        throw new Error('still unavailable');
+      },
+    };
+    const sent = [];
+    const resolveSpace = async () => ({ send: async value => sent.push(value) });
+    assert.deepEqual(await recoverPending(state, backend, resolveSpace), { attempted: 100, completed: 0 });
+    assert.deepEqual(await recoverPending(state, backend, resolveSpace).then(({ completed }) => completed), 1);
+    assert.ok(sent.includes('Recovered final row'));
+  } finally {
+    state.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('requires secure backend origin', () => {
   assert.throws(() => createBackend('http://example.com'), /HTTPS/);
   assert.doesNotThrow(() => createBackend('http://localhost:8000'));
