@@ -18,7 +18,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlmodel import Session, select
 
-from . import auth, jev_client, menu_fetch_client
+from . import auth, jev_client, menu_fetch_client, preference_extraction
 from .jev_client import JevError
 from .menu_fetch_client import MenuFetchError
 from .models import SavedPost, Trip, TripMessage
@@ -39,6 +39,7 @@ from .schemas import (
 from .storage import get_session, init_db
 
 MAX_DISHES_PER_SCORE = 50
+PREFERENCE_MIN_CONFIDENCE = 0.7
 
 
 class ApiError(Exception):
@@ -122,6 +123,48 @@ def _serialize_trip(trip: Trip, session: Session) -> TripOut:
         clarification=trip.clarification,
         messages=[MessageOut(id=m.id, role=m.role, text=m.text, created_at=m.created_at) for m in messages],
         decisions=[],
+    )
+
+
+async def _handle_preference_message(trip: Trip, text: str, session: Session) -> str:
+    """Free text with no source_url: code proposes candidate diet/budget
+    values (regex, never Jev — see preference_extraction.py), then Jev
+    judges whether the message really asserts each one. Jev is never asked
+    to invent a preference value, only to confirm or reject a candidate."""
+    candidates = preference_extraction.extract_candidates(text)
+    if not candidates:
+        return "Got your message. Intent handling and recommendations are coming in a later update."
+
+    try:
+        confirmations = await jev_client.confirm_preference_candidates(text, candidates)
+    except JevError:
+        raise ApiError(502, "PROVIDER_FAILURE", "Jev is unavailable.", retryable=True)
+
+    accepted: list[str] = []
+    unclear: list[str] = []
+    for field, value in candidates.items():
+        answer = confirmations[field]
+        if answer.choice == "yes" and answer.confidence >= PREFERENCE_MIN_CONFIDENCE:
+            setattr(trip, field, value)
+            accepted.append(f"{field}={value}")
+        elif answer.choice != "no":
+            # "unclear", or a low-confidence "yes" — don't silently apply it.
+            unclear.append(field)
+        # "no": the extractor's guess wasn't what they meant; skip quietly.
+
+    reply_parts = []
+    if accepted:
+        reply_parts.append(f"Updated your preferences: {', '.join(accepted)}.")
+    if unclear:
+        trip.status = "needs_clarification"
+        trip.clarification = f"Did you mean to update your {' and '.join(unclear)} preference? Please confirm."
+        reply_parts.append(trip.clarification)
+    elif accepted and trip.status == "needs_clarification":
+        trip.status = "saved"
+        trip.clarification = None
+
+    return " ".join(reply_parts) if reply_parts else (
+        "Got your message. Intent handling and recommendations are coming in a later update."
     )
 
 
@@ -213,7 +256,7 @@ def read_trip(
 
 
 @app.post("/trips/{trip_id}/messages", response_model=PostMessageResponse)
-def post_message(
+async def post_message(
     trip_id: str,
     payload: PostMessageRequest,
     authorization: Optional[str] = Header(default=None),
@@ -290,7 +333,9 @@ def post_message(
         # Trip research is not wired yet; don't promise it. Scoring is available via POST /score.
         reply_text = "Saved to your trip. Automatic menu research for saved places isn't available yet."
     else:
-        reply_text = "Got your message. Intent handling and recommendations are coming in a later update."
+        reply_text = await _handle_preference_message(trip, text, session)
+
+    session.add(trip)
 
     session.add(
         TripMessage(

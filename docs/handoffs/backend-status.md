@@ -46,11 +46,17 @@ this snapshot before you build on top of it.
   (`jev_client.py`) for real per-dish dietary verdicts — verified live against
   an actual restaurant (Lulla NYC), not mocked; automated tests fake both
   adapters (`tests/test_score.py`), per this repo's own testing convention of
-  separating fast fake-provider unit tests from a manual live check. Trip
-  messages still don't call Jev for intent/routing — that's the next backend
-  gap (see below). Run: `cd backend/scoring && uv sync && uv run uvicorn
+  separating fast fake-provider unit tests from a manual live check.
+  `POST /trips/{id}/messages` now also interprets free-text preference
+  updates ("Make this vegan and under $25") via `preference_extraction.py`
+  (deterministic regex candidates) + `jev_client.confirm_preference_candidates`
+  (Jev confirms/rejects each candidate) — also verified live, including the
+  `yes`/`no`/`unclear` paths (see PR #28's description for exact transcripts).
+  Full intent classification (research requests, recall, candidate selection)
+  is still the honest placeholder reply — that's the next backend gap (see
+  below). Run: `cd backend/scoring && uv sync && uv run uvicorn
   backend_scoring.main:app --reload --port 8000`. Tests: `uv run pytest -q`
-  (16 passing). Needs `TYPESAFE_API_KEY` in `backend/scoring/.env` (git-ignored,
+  (28 passing). Needs `TYPESAFE_API_KEY` in `backend/scoring/.env` (git-ignored,
   already configured in this session) and a running `backend/menu_fetch`
   bridge (needs `BROWSERBASE_API_KEY` in root `.env`, also already configured
   in this session — check with whoever picks this up whether it's still
@@ -86,21 +92,30 @@ this snapshot before you build on top of it.
 
 ## What is explicitly NOT built yet (the real gap)
 
-`POST /score` (per-dish menu scoring, real Jev verdicts) is now done — see
-above. Still missing from `backend/scoring`:
+`POST /score` (per-dish menu scoring, real Jev verdicts) and preference
+interpretation on trip messages are now done — see above. Still missing from
+`backend/scoring`:
 
-1. **Jev wiring for the trip-message flow** — `POST /trips/{id}/messages`
-   still gives honest placeholder replies instead of calling Jev for intent
-   classification, place resolution, preference interpretation, next-action
-   routing, candidate selection, or recall. `jev_client.py` already has a
-   working pattern (batched Choice questions in one call) to extend from.
-2. Trip status transitions (`needs_clarification`/`researching`/`ready`/
-   `failed`) driven by those real Jev decisions, and real `DecisionTrace`
-   records (currently always `[]` in `TripOut`).
+1. **Jev wiring for the rest of the trip-message flow** — intent
+   classification (save vs. research request vs. recall vs. other), place
+   resolution, next-action routing (fetch menu / seek evidence / recommend /
+   stop), candidate selection, and recall are all still the honest
+   placeholder reply. `jev_client.py`'s `ask_choice_questions()` +
+   `confirm_preference_candidates()` are a working pattern to extend from —
+   preference interpretation shipped in PR #28 is the template: code
+   proposes bounded candidates, Jev only confirms/rejects/flags-unclear.
+2. Trip status transitions beyond `needs_clarification`↔`saved`
+   (`researching`/`ready`/`failed`) and real `DecisionTrace` records
+   (currently always `[]` in `TripOut`).
 3. Evidence escalation in `/score` (re-scoring uncertain dishes against
    reviews/diet-site sources) — `backend/menu_fetch` has no such fetch
    capability yet, so `/score` always returns `escalated: false`. Not
    blocking; just not built.
+4. Candidate research: nothing yet turns a `SavedPost` into scored
+   `Candidate`s on the trip. `backend/menu_fetch` now also has
+   `/search-sources` (PR #21, live-verified by Nikhil) for discovering menu
+   URLs — the natural next building block once intent/next-action routing
+   exists to decide when to call it.
 
 No blocker on Jev access anymore — a real `TYPESAFE_API_KEY` and
 `BROWSERBASE_API_KEY` are both configured locally in this session (see above).
@@ -143,12 +158,19 @@ agents are moving fast on the same repo.
 
 ## Immediate next step queued when this was written
 
-Wire Jev into `POST /trips/{id}/messages` (intent/routing — see gap #1
-above), so trip replies stop being placeholders. A trip-pairing/exchange
-endpoint (short-lived, single-use token so Photon/voice can hand out a safe
-web link without exposing the raw bearer token) was scoped but
-deprioritized — nothing currently blocks on it since voice's demo path
-bypasses it by manual trip ID/token entry. Revisit either if there's time.
+Wire Jev intent classification into `POST /trips/{id}/messages` (gap #1
+above) — this is the biggest remaining honesty gap: most trip messages still
+get a flat placeholder reply. A trip-pairing/exchange endpoint was scoped but
+deprioritized on the backend side; PR #27 ("Pair Photon trips with the web
+and voice console", open as of this writing) may already be covering that
+need from another angle — check it before building a backend version.
+
+## PRs opened this session (chronological)
+
+- #18 — trip API core (`POST /trips`, `GET /trips/{id}`, `POST /trips/{id}/messages`, saved-post capture). Merged.
+- #23 — `POST /score` with real Jev + `backend/menu_fetch` wiring. Merged.
+- #28 — Jev-confirmed preference interpretation for trip messages. Open as of this writing.
+- Also commented on draft PR #24, flagging it as superseded by #23 (not closed — left for its author).
 
 ## Note on checking GitHub while working
 

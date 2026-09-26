@@ -62,12 +62,14 @@ def test_message_with_source_url_creates_a_saved_post(client: TestClient):
 
 
 def test_text_only_message_does_not_create_a_saved_post(client: TestClient):
+    # No diet/budget keywords here on purpose — preference-update text is
+    # covered separately in test_preferences.py, which needs to mock Jev.
     trip_id, token = _create_trip(client)
 
     resp = client.post(
         f"/trips/{trip_id}/messages",
         headers=_auth(token),
-        json={"client_message_id": str(uuid.uuid4()), "text": "Make this vegan and under $25"},
+        json={"client_message_id": str(uuid.uuid4()), "text": "What's a good spot for dinner tonight?"},
     )
     assert resp.status_code == 200
     assert resp.json()["trip"]["saves"] == []
