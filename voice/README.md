@@ -11,19 +11,19 @@ node --env-file=../.env server.mjs
 
 Run from `voice/`. On first configuration, copy the printed agent ID to `ELEVENLABS_AGENT_ID` in `.env`. Later runs update that named agent. To update a specifically supplied agent ID whose existing name differs, run `node --env-file=../.env configure-agent.mjs --update-existing`; this preserves its existing name. The script never prints the key. Open `http://localhost:8788/`, enter an existing trip ID and trip token, then click **Start voice**. The text field still works if the microphone or ElevenLabs is unavailable. The backend must implement the canonical `GET /trips/{id}` and `POST /trips/{id}/messages` contract.
 
-For the existing Next.js trip composer, mount with `showTextFallback: false`: its own message field remains the text fallback, and the voice buttons have `type="button"` so they cannot submit the composer. In `web/src/components/trip/trip-app.tsx`, replace the unused external `voiceSlot` prop with `voiceSlot={<VoiceControl tripId={trip.id} onTrip={refresh} />}`. The `VoiceControl` client component should read `loadTripSession()` after mount, require `session.tripId === tripId`, and load `http://localhost:8788/voice-client.mjs` as a module script. On script load, call:
+For the existing Next.js trip composer, copy `VoiceControl.tsx` into `web/src/components/trip/` and import it into `trip-app.tsx`. The wrapper loads the served module once, cleans up the voice session on unmount, skips its own text form, and makes its buttons non-submitting. In `TripApp`, read `loadTripSession()` from `web/src/lib/api/trip-session.ts` after hydration and require `session.tripId === trip.id`; then pass the voice control to the composer's `voiceSlot`:
 
 ```ts
-const dispose = window.JevVoice.mountVoice(container, {
-  tripId,
-  accessToken: session.token,
-  voiceBase: 'http://localhost:8788',
-  onTrip,
-  showTextFallback: false,
-});
+const session = loadTripSession();
+voiceSlot={session?.tripId === trip.id ? <VoiceControl
+  tripId={trip.id}
+  accessToken={session.token}
+  voiceBase="http://localhost:8788"
+  onTrip={refresh}
+/> : null}
 ```
 
-Call `dispose()` on unmount; keep the token out of URLs. The hook's `refresh` callback updates the visible trip after a voice message. Set `VOICE_ALLOWED_ORIGIN=http://localhost:3000` for the separate Next dev origin, and set voice `API_BASE_URL` and web `BACKEND_API_URL` to the same backend origin. For production, serve the voice route behind the same app origin and HTTPS; the module loads the official `@elevenlabs/client` SDK from esm.sh only after Start is clicked. The standalone demo keeps its own text form when that SDK is unavailable.
+Keep the token out of URLs. The hook's `refresh` callback updates the visible trip after a voice message. Set `VOICE_ALLOWED_ORIGIN=http://localhost:3000` for the separate Next dev origin, and set voice `API_BASE_URL` and web `BACKEND_API_URL` to the same backend origin. For production, serve the voice route behind the same app origin and HTTPS; the module loads the official `@elevenlabs/client` SDK from esm.sh only after Start is clicked. The standalone demo keeps its own text form when that SDK is unavailable.
 
 The bridge exposes `POST /trips/:id/session`, `GET /trips/:id/context`, and `POST /trips/:id/message` with the same bearer auth. Context exposes factual status/counts, not a separate recommendation engine. The client tool arguments remain `{trip_id}` and `{trip_id,client_message_id,text}`. The browser rejects a model-supplied trip ID different from the active trip; the server verifies it too. No private agent session is created until a user clicks Start.
 

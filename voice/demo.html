@@ -6,9 +6,11 @@
 <main id="voice"></main>
 <script type="module">
 import { mountVoice } from './voice-client.mjs';
+let dispose = () => {};
 document.querySelector('#connect').onsubmit = event => {
   event.preventDefault(); const values = new FormData(event.currentTarget);
-  try { mountVoice(document.querySelector('#voice'), { tripId: values.get('trip_id'), accessToken: values.get('token') }); }
+  dispose(); dispose = () => {};
+  try { dispose = mountVoice(document.querySelector('#voice'), { tripId: values.get('trip_id'), accessToken: values.get('token') }); }
   catch (error) { document.querySelector('#voice').textContent = error.message; }
 };
 </script></html>
