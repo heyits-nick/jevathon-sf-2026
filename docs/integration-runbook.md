@@ -2,6 +2,14 @@
 
 Use Node 25. Credentials belong in ignored root `.env`; `.env.example` contains names only. `API_BASE_URL` must be the real backend base URL serving the canonical trip API. Credits do not substitute for a running backend.
 
+## Shared backend and frontend
+
+The teammate's backend is Python/FastAPI under `backend/scoring/`. Start it from that directory with `uv sync`, then `uv run uvicorn backend_scoring.main:app --host 127.0.0.1 --port 8000 --env-file ../../.env`. Loading the root environment makes the configured Jev key available when the scoring slice lands. Point provider `API_BASE_URL` and frontend `BACKEND_API_URL` at `http://127.0.0.1:8000`; the frontend variable belongs in its ignored `web/.env.local` or server environment. Start the frontend with `npm ci --prefix web` and `npm run dev --prefix web`.
+
+The initial trip-core slice implements persistence, bearer authorization, and message idempotency. Its placeholder replies do not demonstrate research. Verify that the latest backend adds real Jev decisions, menu research, and `/score` before calling the full recommendation flow complete.
+
+Jev readiness was verified with the documented read-only models endpoint on September 26. The evaluation endpoint is `POST https://api.typesafe.ai/v1/systemone`, with bearer auth and `{state, model: "jev-latest", questions}`. Use a Choice question with explicit `yes`, `no`, and `unclear` criteria for dietary verdicts. Noul has no confidence field, and Score is a rubric index. Put the question and evidence boundaries in instructions, not just the question-map key. See the [official API reference](https://docs.typesafe.ai/api).
+
 ## Menu evidence: usable immediately
 
 ```powershell
