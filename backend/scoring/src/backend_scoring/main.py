@@ -131,6 +131,9 @@ async def score_restaurant(payload: ScoreRequest) -> ScoreResponse:
     try:
         fetch_result = await menu_fetch_client.fetch_menu(payload.menu_url, payload.restaurant)
     except MenuFetchError as exc:
+        if exc.code == "UNSUPPORTED_SOURCE":
+            # Contract: an unreadable menu (e.g. a PDF) is 422 NO_MENU_EVIDENCE.
+            raise ApiError(422, "NO_MENU_EVIDENCE", exc.message, False)
         raise ApiError(exc.status, exc.code, exc.message, exc.retryable)
     fetch_ms = int((time.monotonic() - fetch_start) * 1000)
 
@@ -284,7 +287,8 @@ def post_message(
         # this place" apart from "make this vegan" is Jev's intent stage
         # (docs/architecture.md), not a heuristic this slice should guess at.
         session.add(SavedPost(trip_id=trip_id, source_url=source_url, note=text))
-        reply_text = "Saved. I'll research this once I have your preferences."
+        # Trip research is not wired yet; don't promise it. Scoring is available via POST /score.
+        reply_text = "Saved to your trip. Automatic menu research for saved places isn't available yet."
     else:
         reply_text = "Got your message. Intent handling and recommendations are coming in a later update."
 
