@@ -1,6 +1,6 @@
 import { TriangleAlertIcon } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import type { ScoreResponse } from "@/lib/api/types";
+import type { Evidence, ScoreResponse } from "@/lib/api/types";
 import { ConfidenceMeter } from "./confidence-meter";
 import { DishList } from "./dish-list";
 import { EvidenceList } from "./evidence-list";
@@ -12,12 +12,22 @@ interface ScoreResultProps {
   roundTripMs?: number;
   /** Changes per run so the confidence meter replays its animation. */
   runKey?: string | number;
+  /** Overrides `result.evidence`, e.g. with a trip candidate's merged evidence. */
+  evidence?: Evidence[];
+  /** Hide when the surrounding card already titles the restaurant. */
+  showRestaurantName?: boolean;
 }
 
-export function ScoreResult({ result, roundTripMs, runKey }: ScoreResultProps) {
+export function ScoreResult({
+  result,
+  roundTripMs,
+  runKey,
+  evidence = result.evidence ?? [],
+  showRestaurantName = true,
+}: ScoreResultProps) {
   return (
     <div className="space-y-6">
-      <RestaurantSummary result={result} />
+      <RestaurantSummary result={result} showName={showRestaurantName} />
       {result.warnings?.map((warning) => (
         <Alert key={warning}>
           <TriangleAlertIcon />
@@ -27,7 +37,7 @@ export function ScoreResult({ result, roundTripMs, runKey }: ScoreResultProps) {
       <ConfidenceMeter key={runKey} result={result} />
       <TimingStats result={result} roundTripMs={roundTripMs} />
       <DishList dishes={result.dishes} />
-      <EvidenceList evidence={result.evidence ?? []} />
+      <EvidenceList evidence={evidence} />
     </div>
   );
 }
