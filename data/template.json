@@ -1,0 +1,20 @@
+{
+  "label": "DEVELOPMENT/TEST DATA - hand-labeled expected answers, not a live result",
+  "id": "restaurant-slug-diet",
+  "restaurant": "Restaurant Name",
+  "menu_url": "https://example.com/menu",
+  "diet": "vegetarian",
+  "menu_format": "html",
+  "checked_at": "2026-09-26T13:45:00-07:00",
+  "checked_by": "name",
+  "case_type": "clear_pass",
+  "expected_dishes": [
+    {
+      "name": "Dish name exactly as printed on the menu",
+      "verdict": "yes",
+      "evidence": "Short quote from the menu that supports the verdict",
+      "note": "Why this verdict"
+    }
+  ],
+  "notes": ""
+}

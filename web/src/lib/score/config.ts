@@ -7,7 +7,7 @@ export const DIETS = [
 ];
 
 /** Below this, a verdict is displayed as uncertain rather than trusted. */
-export const LOW_CONFIDENCE_THRESHOLD = 0.7;
+export const LOW_CONFIDENCE_THRESHOLD = 0.8;
 
 export const VERDICT_ORDER: Record<Verdict, number> = {
   yes: 0,

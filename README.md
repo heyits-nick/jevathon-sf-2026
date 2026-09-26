@@ -78,4 +78,28 @@ folder to avoid merge conflicts.
 
 ## Setup and demo
 
-To be filled in as components land.
+Provider adapters use Node 25, with credentials in an ignored root `.env`.
+Copy variable names from `.env.example`, then follow the
+[integration runbook](docs/integration-runbook.md) for Browserbase, Photon,
+and ElevenLabs setup, backend hookup, and live verification.
+
+The trip backend URL goes in `API_BASE_URL`. Provider adapters do not replace
+the backend: Jev decisions and persisted trip state remain there.
+### `backend/scoring` — trip API (Python 3.12, [uv](https://docs.astral.sh/uv/))
+
+```bash
+cd backend/scoring
+uv sync
+uv run uvicorn backend_scoring.main:app --reload --port 8000
+uv run pytest -q
+```
+
+Serves the canonical contract from `docs/architecture.md` at the root path: `POST /trips`,
+`GET /trips/{id}`, `POST /trips/{id}/messages`. `POST /score` is a separate, not-yet-built slice.
+Trips persist to a real SQLite file (`backend/scoring/data/trips.db`, git-ignored; override the
+path with `TRIP_DB_PATH`), not an in-memory map, so state survives a restart. No environment
+variables are required yet — Jev/API-key wiring lands with the scoring slice.
+
+Point `web/` at it locally via `web/.env.local`: `BACKEND_API_URL=http://localhost:8000`.
+
+Provider startup and live verification are documented in the integration runbook above.

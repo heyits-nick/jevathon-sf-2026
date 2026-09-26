@@ -1,0 +1,20 @@
+[project]
+name = "backend-scoring"
+version = "0.1.0"
+description = "Trip API: saved-post memory, Jev-backed menu scoring, recall."
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.141.1",
+    "sqlmodel>=0.0.47",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.15,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+]

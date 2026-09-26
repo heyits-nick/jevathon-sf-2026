@@ -1,0 +1,89 @@
+"""Wire schema for the shared contract in docs/architecture.md.
+
+Field names and shapes here are canonical — changes must be coordinated with
+web/, photon/, and voice/ per AGENTS.md rule 7.
+"""
+
+from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, Field
+
+
+class Preferences(BaseModel):
+    diet: Optional[str] = None
+    budget: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class CreateTripRequest(BaseModel):
+    destination: Optional[str] = None
+    preferences: Preferences = Field(default_factory=Preferences)
+
+
+class CreateTripResponse(BaseModel):
+    trip_id: str
+    access_token: str
+
+
+class SavedPostOut(BaseModel):
+    id: str
+    source_url: str
+    place_name: Optional[str]
+    note: str
+    created_at: datetime
+
+
+class MessageOut(BaseModel):
+    id: str
+    role: str
+    text: str
+    created_at: datetime
+
+
+class DecisionTraceOut(BaseModel):
+    id: str
+    stage: str
+    model: str
+    choice: Optional[str] = None
+    confidence: Optional[float] = None
+    evidence_ids: list[str] = Field(default_factory=list)
+    duration_ms: int
+    created_at: datetime
+
+
+class TripOut(BaseModel):
+    id: str
+    destination: Optional[str]
+    preferences: Preferences
+    status: str
+    saves: list[SavedPostOut]
+    candidates: list[dict] = Field(default_factory=list)
+    recommended_candidate_ids: list[str] = Field(default_factory=list)
+    selected_candidate_id: Optional[str]
+    clarification: Optional[str]
+    messages: list[MessageOut]
+    decisions: list[DecisionTraceOut] = Field(default_factory=list)
+
+
+class PostMessageRequest(BaseModel):
+    client_message_id: str
+    text: str = ""
+    source_url: Optional[str] = None
+    selected_candidate_id: Optional[str] = None
+
+
+class PostMessageResponse(BaseModel):
+    trip: TripOut
+    reply: str
+
+
+class ErrorBody(BaseModel):
+    code: str
+    message: str
+    retryable: bool
+
+
+class ErrorResponse(BaseModel):
+    error: ErrorBody
+    trip_id: Optional[str] = None
