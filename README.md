@@ -94,11 +94,18 @@ uv run uvicorn backend_scoring.main:app --reload --port 8000
 uv run pytest -q
 ```
 
-Serves the canonical contract from `docs/architecture.md` at the root path: `POST /trips`,
-`GET /trips/{id}`, `POST /trips/{id}/messages`. `POST /score` is a separate, not-yet-built slice.
-Trips persist to a real SQLite file (`backend/scoring/data/trips.db`, git-ignored; override the
-path with `TRIP_DB_PATH`), not an in-memory map, so state survives a restart. No environment
-variables are required yet — Jev/API-key wiring lands with the scoring slice.
+Serves the canonical contract from `docs/architecture.md` at the root path: `POST /score`,
+`POST /trips`, `GET /trips/{id}`, `POST /trips/{id}/messages`. Trips persist to a real SQLite
+file (`backend/scoring/data/trips.db`, git-ignored; override the path with `TRIP_DB_PATH`), not
+an in-memory map, so state survives a restart.
+
+`/score` calls Jev for real per-dish dietary verdicts and `backend/menu_fetch`'s HTTP bridge for
+menu evidence — both must be reachable. Environment (in an ignored `backend/scoring/.env`):
+`TYPESAFE_API_KEY` (required), `MENU_FETCH_BASE_URL` (default `http://127.0.0.1:8101`),
+`MENU_FETCH_TOKEN` (only if the bridge isn't on localhost), `YES_MIN_CONFIDENCE` (default `0.8`),
+`JEV_MODEL` (default `jev-latest`). Evidence escalation (re-scoring uncertain dishes against
+reviews/diet-site sources) isn't implemented yet — `backend/menu_fetch` has no such fetch
+capability to escalate to, so `/score` always returns `escalated: false`.
 
 Point `web/` at it locally via `web/.env.local`: `BACKEND_API_URL=http://localhost:8000`.
 

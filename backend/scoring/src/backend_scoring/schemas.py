@@ -5,9 +5,51 @@ web/, photon/, and voice/ per AGENTS.md rule 7.
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
+
+
+class ScoreRequest(BaseModel):
+    restaurant: str
+    menu_url: str
+    diet: str
+
+
+class EvidenceOut(BaseModel):
+    id: str
+    url: str
+    quote: str
+    kind: Literal["menu", "review", "diet_site"]
+    checked_at: str
+
+
+class ScoredDishOut(BaseModel):
+    name: str
+    verdict: Literal["yes", "no", "unclear"]
+    confidence: float
+    source: str
+    jev_ms: int
+    evidence_ids: list[str] = Field(default_factory=list)
+
+
+class ScoreAggregate(BaseModel):
+    score: float
+    confidence: float
+
+
+class ScoreResponse(BaseModel):
+    restaurant: str
+    diet: str
+    score: float
+    confidence: float
+    escalated: bool
+    before_escalation: Optional[ScoreAggregate] = None
+    dishes: list[ScoredDishOut]
+    timing_ms: dict[str, int]
+    jev_cost_usd: Optional[float] = None
+    evidence: list[EvidenceOut] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
 
 class Preferences(BaseModel):
