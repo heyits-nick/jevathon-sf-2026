@@ -8,26 +8,37 @@ scoring are a later slice (see docs/roadmap.md P0/P1); nothing here fabricates
 those decisions.
 """
 
+import os
+import time
 from contextlib import asynccontextmanager
 from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlmodel import Session, select
 
-from . import auth
+from . import auth, jev_client, menu_fetch_client
+from .jev_client import JevError
+from .menu_fetch_client import MenuFetchError
 from .models import SavedPost, Trip, TripMessage
 from .schemas import (
     CreateTripRequest,
     CreateTripResponse,
+    EvidenceOut,
     MessageOut,
     Preferences,
     PostMessageRequest,
     PostMessageResponse,
     SavedPostOut,
+    ScoreRequest,
+    ScoreResponse,
+    ScoredDishOut,
     TripOut,
 )
 from .storage import get_session, init_db
+
+MAX_DISHES_PER_SCORE = 50
 
 
 class ApiError(Exception):
@@ -61,6 +72,16 @@ def handle_api_error(_: Request, exc: ApiError) -> JSONResponse:
     if exc.trip_id:
         body["trip_id"] = exc.trip_id
     return JSONResponse(status_code=exc.status_code, content=body)
+
+
+@app.exception_handler(RequestValidationError)
+def handle_validation_error(_: Request, __: RequestValidationError) -> JSONResponse:
+    # docs/architecture.md specifies 400 for validation failures; FastAPI's
+    # default is 422 with a different body shape, so normalize both.
+    return JSONResponse(
+        status_code=400,
+        content={"error": {"code": "INVALID_REQUEST", "message": "Request did not match the expected shape.", "retryable": False}},
+    )
 
 
 def _extract_bearer_token(authorization: Optional[str]) -> str:
@@ -101,6 +122,64 @@ def _serialize_trip(trip: Trip, session: Session) -> TripOut:
         clarification=trip.clarification,
         messages=[MessageOut(id=m.id, role=m.role, text=m.text, created_at=m.created_at) for m in messages],
         decisions=[],
+    )
+
+
+@app.post("/score", response_model=ScoreResponse)
+async def score_restaurant(payload: ScoreRequest) -> ScoreResponse:
+    fetch_start = time.monotonic()
+    try:
+        fetch_result = await menu_fetch_client.fetch_menu(payload.menu_url, payload.restaurant)
+    except MenuFetchError as exc:
+        raise ApiError(exc.status, exc.code, exc.message, exc.retryable)
+    fetch_ms = int((time.monotonic() - fetch_start) * 1000)
+
+    dishes = fetch_result.get("dishes") or []
+    if not dishes:
+        raise ApiError(422, "NO_MENU_EVIDENCE", "No dishes could be extracted from this menu.")
+
+    warnings: list[str] = []
+    if len(dishes) > MAX_DISHES_PER_SCORE:
+        dishes = dishes[:MAX_DISHES_PER_SCORE]
+        warnings.append(f"Only the first {MAX_DISHES_PER_SCORE} dishes were scored.")
+
+    try:
+        verdicts = await jev_client.score_dishes(diet=payload.diet, dishes=dishes)
+    except JevError:
+        raise ApiError(502, "PROVIDER_FAILURE", "Jev is unavailable.", retryable=True)
+
+    dish_outs = [
+        ScoredDishOut(
+            name=dish["name"],
+            verdict=verdict.choice,
+            confidence=verdict.confidence,
+            source="menu",
+            jev_ms=verdict.duration_ms,
+            evidence_ids=dish.get("evidence_ids") or [],
+        )
+        for dish, verdict in zip(dishes, verdicts)
+    ]
+
+    yes_min_confidence = float(os.environ.get("YES_MIN_CONFIDENCE", "0.8"))
+    qualifying = sum(1 for d in dish_outs if d.verdict == "yes" and d.confidence >= yes_min_confidence)
+    score = qualifying / len(dish_outs)
+    confidence = sum(d.confidence for d in dish_outs) / len(dish_outs)
+
+    return ScoreResponse(
+        restaurant=fetch_result.get("restaurant") or payload.restaurant,
+        diet=payload.diet,
+        score=score,
+        confidence=confidence,
+        # No evidence-escalation adapter (reviews/diet-site fetch) exists yet
+        # in backend/menu_fetch, so this slice never escalates — that's an
+        # honest scope limit, not a decision this code is faking on Jev's behalf.
+        escalated=False,
+        before_escalation=None,
+        dishes=dish_outs,
+        timing_ms={"fetch": fetch_ms, "jev_total": sum(v.duration_ms for v in verdicts[:1])},
+        jev_cost_usd=None,  # no verified per-token pricing to convert honestly; never invent one
+        evidence=[EvidenceOut(**e) for e in fetch_result.get("evidence") or []],
+        warnings=warnings,
     )
 
 
