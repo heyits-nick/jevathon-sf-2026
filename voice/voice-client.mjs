@@ -1,15 +1,20 @@
 // Mount in the frontend with the same trip ID and bearer token used for web messages.
-export function mountVoice(container, { tripId, accessToken, voiceBase = '', onTrip = () => {} }) {
+export function mountVoice(container, { tripId, accessToken, voiceBase = '', onTrip = () => {}, showTextFallback = true }) {
   if (!container || !/^[A-Za-z0-9_-]{1,128}$/.test(tripId || '') || !accessToken) throw new Error('An authorized trip is required');
   const base = `${voiceBase.replace(/\/$/, '')}/trips/${encodeURIComponent(tripId)}`;
-  const start = document.createElement('button'); start.textContent = 'Start voice';
-  const stop = document.createElement('button'); stop.textContent = 'Stop voice'; stop.disabled = true;
+  const start = document.createElement('button'); start.type = 'button'; start.textContent = 'Start voice';
+  const stop = document.createElement('button'); stop.type = 'button'; stop.textContent = 'Stop voice'; stop.disabled = true;
   const status = document.createElement('p'); status.setAttribute('role', 'status'); status.textContent = 'Voice is ready.';
   const transcript = document.createElement('div'); transcript.setAttribute('aria-live', 'polite');
-  const form = document.createElement('form');
-  const input = document.createElement('input'); input.placeholder = 'Type a message if voice is unavailable'; input.required = true;
-  const submit = document.createElement('button'); submit.textContent = 'Send';
-  form.append(input, submit); container.replaceChildren(start, stop, status, transcript, form);
+  const form = showTextFallback ? document.createElement('form') : null;
+  const input = showTextFallback ? document.createElement('input') : null;
+  const submit = showTextFallback ? document.createElement('button') : null;
+  if (form) {
+    input.placeholder = 'Type a message if voice is unavailable'; input.required = true;
+    submit.textContent = 'Send';
+    form.append(input, submit);
+  }
+  container.replaceChildren(start, stop, status, transcript, ...(form ? [form] : []));
   let conversation;
   const request = async (action, data) => {
     const response = await fetch(`${base}/${action}`, {
@@ -32,6 +37,7 @@ export function mountVoice(container, { tripId, accessToken, voiceBase = '', onT
       return { reply: result.reply };
     } catch (e) { return { error: e.message || 'Trip service unavailable. Do not answer from memory.' }; }
   };
+  const fallbackHint = showTextFallback ? 'You can still type below.' : 'Use the trip message field.';
   start.onclick = async () => {
     start.disabled = true; status.textContent = 'Connecting to voice…';
     try {
@@ -44,16 +50,16 @@ export function mountVoice(container, { tripId, accessToken, voiceBase = '', onT
           handleTripMessage: handleMessage
         },
         onConnect: () => { status.textContent = 'Voice connected'; stop.disabled = false; },
-        onDisconnect: () => { status.textContent = 'Voice disconnected. You can still type below.'; start.disabled = false; stop.disabled = true; },
+        onDisconnect: () => { status.textContent = `Voice disconnected. ${fallbackHint}`; start.disabled = false; stop.disabled = true; },
         onMessage: ({ source, message }) => { if (message) addLine(source === 'user' ? 'You' : 'Jev', message); },
-        onError: () => { status.textContent = 'Voice unavailable. You can still type below.'; }
+        onError: () => { status.textContent = `Voice unavailable. ${fallbackHint}`; }
       });
     } catch {
-      status.textContent = 'Voice unavailable or microphone denied. You can still type below.'; start.disabled = false;
+      status.textContent = `Voice unavailable or microphone denied. ${fallbackHint}`; start.disabled = false;
     }
   };
   stop.onclick = async () => { if (conversation) await conversation.endSession(); conversation = undefined; };
-  form.onsubmit = async event => {
+  if (form) form.onsubmit = async event => {
     event.preventDefault(); const text = input.value.trim(); if (!text) return;
     submit.disabled = true; addLine('You', text); input.value = '';
     const result = await handleMessage({ trip_id: tripId, client_message_id: crypto.randomUUID(), text });

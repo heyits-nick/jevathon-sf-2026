@@ -1,6 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from './server.mjs';
+import { mountVoice } from './voice-client.mjs';
+
+test('composer mount has no nested form and voice buttons never submit', () => {
+  const originalDocument = globalThis.document;
+  globalThis.document = { createElement: tagName => ({
+    tagName: tagName.toUpperCase(), children: [],
+    setAttribute() {}, append(...children) { this.children.push(...children); }
+  }) };
+  const container = { children: [], replaceChildren(...children) { this.children = children; } };
+  try {
+    const unmount = mountVoice(container, { tripId: 'trip1', accessToken: 'valid-token', showTextFallback: false });
+    assert.equal(container.children.some(child => child.tagName === 'FORM'), false);
+    assert.deepEqual(container.children.filter(child => child.tagName === 'BUTTON').map(child => child.type), ['button', 'button']);
+    unmount();
+    assert.equal(container.children.length, 0);
+    mountVoice(container, { tripId: 'trip1', accessToken: 'valid-token' });
+    assert.equal(container.children.some(child => child.tagName === 'FORM'), true);
+  } finally { globalThis.document = originalDocument; }
+});
 
 test('voice bridge rechecks trip auth and forwards only approved replies', async () => {
   const calls = [];
