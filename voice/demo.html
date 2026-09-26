@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Jev voice demo</title>
+<style>body{font:16px system-ui;max-width:650px;margin:3rem auto;padding:1rem}input{padding:.6rem;margin:.3rem;max-width:100%}button{padding:.6rem;margin:.3rem}#voice{margin-top:2rem}#voice div{max-height:22rem;overflow:auto;border:1px solid #ccc;padding:1rem}</style>
+<h1>Jev voice</h1><p>Open an existing trip by entering its ID and access token. The token stays in this page and is never put in a URL.</p>
+<form id="connect"><label>Trip ID <input name="trip_id" autocomplete="off" required></label><label>Trip token <input name="token" type="password" autocomplete="off" required></label><button>Open trip</button></form>
+<main id="voice"></main>
+<script type="module">
+import { mountVoice } from './voice-client.mjs';
+document.querySelector('#connect').onsubmit = event => {
+  event.preventDefault(); const values = new FormData(event.currentTarget);
+  try { mountVoice(document.querySelector('#voice'), { tripId: values.get('trip_id'), accessToken: values.get('token') }); }
+  catch (error) { document.querySelector('#voice').textContent = error.message; }
+};
+</script></html>
