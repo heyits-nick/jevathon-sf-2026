@@ -1,0 +1,8 @@
+{
+  "name": "jevathon-menu-fetch",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
