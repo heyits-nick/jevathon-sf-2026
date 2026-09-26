@@ -30,6 +30,10 @@ DIET_FIT_CRITERIA = {
 }
 
 
+def current_model() -> str:
+    return os.environ.get("JEV_MODEL", "jev-latest")
+
+
 class JevError(Exception):
     """Jev is unavailable or returned something we can't trust. Callers must
     surface this as a visible failure, never fall back to a guess."""
@@ -58,7 +62,7 @@ async def ask_choice_questions(state: dict, questions: dict[str, dict]) -> dict[
     if not questions:
         return {}
 
-    model = os.environ.get("JEV_MODEL", "jev-latest")
+    model = current_model()
     payload = {"state": state, "model": model, "questions": questions}
 
     start = time.monotonic()

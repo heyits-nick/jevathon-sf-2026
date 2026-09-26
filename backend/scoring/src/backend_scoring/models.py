@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import JSON, Column, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
@@ -59,4 +59,23 @@ class TripMessage(SQLModel, table=True):
     text: str = ""
     source_url: Optional[str] = None
     selected_candidate_id: Optional[str] = None
+    created_at: datetime = Field(default_factory=_now)
+
+
+class DecisionTrace(SQLModel, table=True):
+    """One row per real Jev call scoped to a trip. Per docs/architecture.md:
+    "Persist an actual trace for each decision ... Do not invent decisions
+    for steps that did not call Jev" — this table exists so that rule is
+    actually enforced, not just documented. Nothing writes here except a
+    real, completed Jev response.
+    """
+
+    id: str = Field(default_factory=_new_id, primary_key=True)
+    trip_id: str = Field(foreign_key="trip.id", index=True)
+    stage: str
+    model: str
+    choice: Optional[str] = None
+    confidence: Optional[float] = None
+    evidence_ids: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    duration_ms: int
     created_at: datetime = Field(default_factory=_now)
