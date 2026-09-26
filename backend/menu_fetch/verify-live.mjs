@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 const [mode, restaurant, menuUrl, diet = 'vegetarian', dishName] = process.argv.slice(2);
 const api = process.env.API_BASE_URL || 'http://127.0.0.1:8000';
-const menuApi = process.env.MENU_FETCH_URL || 'http://127.0.0.1:8101';
+const menuApi = process.env.MENU_FETCH_BASE_URL || 'http://127.0.0.1:8101';
 
 async function post(base, path, body, token) {
   const response = await fetch(base + path, {
@@ -52,6 +52,10 @@ try {
     if (!read.ok || !tripState.saves?.some(item => item.source_url === menuUrl)) throw new Error('Trip did not persist the source URL.');
     const score = await post(api, '/score', { restaurant, menu_url: menuUrl, diet }, trip.access_token);
     if (typeof score.score !== 'number' || !Array.isArray(score.dishes)) throw new Error('Score response did not match the contract.');
+    if (tripState.status !== 'ready' || !tripState.decisions?.length || !tripState.candidates?.length ||
+        !tripState.recommended_candidate_ids?.some(id => tripState.candidates.some(candidate => candidate.id === id))) {
+      throw new Error('TRIP_PIPELINE_NOT_READY: /score works, but the saved trip has no completed Jev recommendation.');
+    }
     console.log(JSON.stringify({ source_url: menuUrl, menu_dishes: menu.dishes.length, score: score.score, scored_dishes: score.dishes.length, status: tripState.status, saves: tripState.saves.length, candidates: tripState.candidates?.length, decisions: tripState.decisions?.length, score_timing_ms: score.timing_ms }));
   }
 } catch (error) {
