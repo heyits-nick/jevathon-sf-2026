@@ -44,8 +44,9 @@ back as a confident `yes`.**
    Use a 60-second timeout per request.
 2. If the response is an error, check that the body matches
    `{"error": {"code", "message", "retryable"}}`. Report the code. A `422` with
-   `NO_MENU_EVIDENCE` is an acceptable result for a `menu_format` of `pdf` or
-   `image`. A timeout or `5xx` is reported as `PROVIDER_FAILURE`, not a pass.
+   `NO_MENU_EVIDENCE` or `UNSUPPORTED_SOURCE` is an acceptable result for a
+   `menu_format` of `pdf` or `image`; the menu fetcher raises
+   `UNSUPPORTED_SOURCE` for non-HTML pages. A timeout or `5xx` is reported as `PROVIDER_FAILURE`, not a pass.
    Every other error response is a **FAIL**. `PROVIDER_FAILURE` also makes the
    run exit nonzero.
 3. If the response succeeds, check that it has the contract fields
