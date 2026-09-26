@@ -1,46 +1,45 @@
 # Roadmap
 
-Default plan. Change it as a team; keep this file current so agents follow it.
+The organizer extended the deadline to **3:00 PM PT on September 26**, as reported by Nikhil. Submit by **2:55 PM**. Sponsor credits are available; verify credentials and actual service access before depending on an integration.
 
-## P0: core loop (target 1:30 PM)
+## P0: working saved-post recommendation
 
-- [ ] Browserbase fetches a restaurant's menu page and returns dish text
-- [ ] Split the menu into dishes (name + description)
-- [ ] Jev scores each dish for the chosen diet: `yes` / `no` / `unclear` + confidence
-- [ ] Aggregate into a restaurant score
-- [ ] API endpoint returns the result (contract in architecture.md)
-- [ ] Web page shows per-dish badges and the restaurant score
-- [ ] Test set: 5–10 restaurants with known answers in `data/`
+- [ ] Preserve the existing `POST /score` contract and real per-dish menu scoring.
+- [ ] Browserbase returns menu evidence with source URLs and checked times.
+- [ ] Jev owns every AI judgment; code performs validation, arithmetic, and execution.
+- [ ] Store a shared travel post/place and explicit dietary preferences durably.
+- [ ] Ask for a place when the post cannot be understood; never invent Reel contents.
+- [ ] Jev selects among eligible researched candidates and saves the recommendation.
+- [ ] Web UI displays sources, uncertainty, and the saved result after refresh.
+- [ ] Deploy early and connect the actual shared API across components.
 
-## P1: what makes the demo (target 2:00 PM)
+## P1: continuity and richer decisions
 
-- [ ] Escalation: low-confidence restaurant triggers a review / HappyCow fetch and a Jev re-score
-- [ ] Confidence meter visibly rising after escalation
-- [ ] Latency and cost shown on screen (Jev ms per dish)
-- [ ] iMessage via Photon. Cut if not working by 1:45 PM.
+- [ ] Jev decides whether uncertainty warrants another evidence lookup, within code-enforced limits.
+- [ ] Jev re-evaluates uncertain dishes; confidence may increase or decrease.
+- [ ] Photon receives a shared link/message and returns a result from the same backend.
+- [ ] ElevenLabs forwards requests through the backend and recalls the same saved trip.
+- [ ] Show real Jev decision traces, measured latency, and cost only when known.
 
-## P2: only if P1 is done
+## P2: only after the complete flow works
 
-- [ ] Instagram input: user pastes post links, we extract restaurant names (no Instagram scraping)
-- [ ] PDF or photo menus via LlamaParse
+- [ ] PDF/photo menu extraction via LlamaParse if a real demonstration input needs it.
+- [ ] Richer multi-post recall and itinerary planning.
 
-## Out of scope today (roadmap slide only)
+## Later
 
-- Transit choice (Uber / bus / BART with budget and preferences)
-- Restaurant booking
-- Instagram feed scraping
+Actual restaurant booking/outbound calls, accommodation booking, automatic Instagram feed import, live navigation, and proactive monitoring. Today's interface must not imply that an unimplemented action or booking succeeded.
 
 ## Checkpoints
 
-| Time | Checkpoint |
-|---|---|
-| 1:30 PM | One real restaurant scored end to end |
-| 2:00 PM | Escalation working |
-| 2:10 PM | Feature freeze; record a backup demo video |
-| 2:20 PM | Submitted on HackerSquad |
+| Time (PT) | Checkpoint |
+| --- | --- |
+| First 10 minutes of work | Agree owner paths, contract, credentials, and runnable skeleton |
+| 2:15 PM | Integrated live save -> evidence -> Jev -> stored result |
+| 2:35 PM | Messaging/voice integrated where working |
+| 2:40 PM | Feature freeze; bug fixes and demo validation only |
+| 2:50 PM | Successful rehearsal and backup recording |
+| 2:55 PM | Submitted on HackerSquad |
+| 3:00 PM | Extended deadline |
 
-## Known risks
-
-- PDF or image menus break extraction. Demo on restaurants with HTML menus.
-- Jev question format unverified. Check console docs first.
-- Photon setup time unknown. Timebox to 1:45 PM.
+If a checkpoint has passed, proceed to the next one; do not shift submission. Scope cuts preserve real research, meaningful Jev decisions, and a usable saved result. Follow your individual document in `docs/handoffs/`.

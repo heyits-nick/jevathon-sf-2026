@@ -1,24 +1,30 @@
 # JEVATHON SF 2026
 
 Team project for the [JEVATHON SF hackathon](https://app.notion.com/p/coderabbit/JEVATHON-Jev-Hackathon-SF-3e796e76cda18143b74af9944bc5cddc)
-(Saturday, September 26, 2026, CodeRabbit HQ). Hacking ends at **2:30 PM PT**.
+(Saturday, September 26, 2026, CodeRabbit HQ). Hacking ends at **3:00 PM PT**
+following the organizer extension reported by Nikhil. Target submission: 2:55 PM.
 
 ## The idea
 
-**Restaurant menus you can trust for your diet.** Yelp and Google diet tags are
-unreliable, and anyone who is vegan, vegetarian, or gluten-free has learned that
-the hard way. We pull the restaurant's actual menu, and Jev decides dish by
-dish whether it fits your restriction, with a confidence score. When Jev is
-unsure, we escalate: pull reviews and diet-specific sites (HappyCow, review
-text) and score again.
+**Turn saved travel inspiration into plans you actually use.** Share a travel
+post or place with the app, preserve its source and your preferences, research
+nearby menus, and return a useful recommendation that you can recall later.
+The existing menu scorer is the core research component: Jev evaluates actual
+menu evidence dish by dish and decides whether further evidence is needed.
+Voice and iMessage use the same stored trip as the web page.
 
 - **User:** a traveler or local with a dietary restriction choosing where to eat.
-- **Why Jev:** each dish is a typed, fast judgment (`yes` / `no` / `unclear` +
-  confidence). An LLM per dish is slow and costly; Jev answers in under a second
-  for a fraction of a cent, so we can score whole menus live.
+- **Why Jev:** all AI judgments run through Jev: intent, place ambiguity,
+  dietary fit, evidence escalation, preference fit, recommendation selection,
+  and memory recall. Measure actual latency/cost; do not promise fixed numbers.
 - **Interfaces:** web page for the demo; iMessage via Photon for real use.
 
 ## How it works
+
+Shared post / place -> saved trip -> real menu evidence -> Jev decision ->
+persisted recommendation -> recall through web, iMessage, or voice.
+
+The menu-scoring core remains:
 
 ```
 restaurant + diet
@@ -29,7 +35,7 @@ Browserbase ── fetch menu text ──► scorer: split into dishes
                                         ▼
                          Jev: fits diet? (yes/no/unclear + confidence)
                                         │
-                   many unclear dishes or low confidence?
+                    Jev: retrieve additional evidence?
                            │ no                 │ yes
                            ▼                    ▼
                         results        Browserbase: reviews / HappyCow
@@ -44,11 +50,12 @@ Details: [docs/architecture.md](docs/architecture.md).
 
 | Path | Owner | What |
 |---|---|---|
-| `backend/menu_fetch/` | Backend A | Browserbase / Stagehand menu and review extraction |
-| `backend/scoring/` | Backend B | Jev questions, per-dish scoring, restaurant aggregate, API |
+| `backend/menu_fetch/` | Nikhil / integrations | Browserbase / Stagehand menu and review extraction |
+| `backend/scoring/` | AI / backend | Jev questions, per-dish scoring, restaurant aggregate, API |
 | `web/` | Designer | Results page and demo screen |
-| `photon/` | Backend B (P1) | iMessage interface |
-| `data/` | David | Test set of restaurants with known answers |
+| `photon/` | Nikhil / integrations | iMessage transport into the shared backend |
+| `voice/` | Nikhil / integrations | ElevenLabs transport into the shared backend |
+| `data/` | Delivery / QA | Clearly labeled test cases and source references |
 | `docs/` | All | Event info, roadmap, architecture |
 
 Folders are created by whoever writes the first file in them. Stay in your own
@@ -56,6 +63,7 @@ folder to avoid merge conflicts.
 
 ## Docs
 
+- [Individual handoffs](docs/handoffs/README.md): separate instructions for each teammate and their AI agent
 - [docs/event.md](docs/event.md): schedule, judging rubric, prizes, sponsor tools, links
 - [docs/roadmap.md](docs/roadmap.md): priorities, checkpoints, what is out of scope
 - [docs/architecture.md](docs/architecture.md): components and data flow
