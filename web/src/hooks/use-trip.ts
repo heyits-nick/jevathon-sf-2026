@@ -80,9 +80,11 @@ export function useTrip() {
       try {
         const next = await api.getTrip(session.tripId, session.token);
         if (generation === requestGeneration.current) setTrip(next);
+        // A superseding request owns the response; still schedule the next poll in case it fails.
+        else setPollTick((n) => n + 1);
       } catch {
         // Keep the last known trip visible and schedule the next poll; failures still count toward MAX_POLLS.
-        if (generation === requestGeneration.current) setPollTick((n) => n + 1);
+        setPollTick((n) => n + 1);
       }
     }, POLL_INTERVAL_MS);
     return () => clearTimeout(id);
@@ -116,7 +118,10 @@ export function useTrip() {
           ...message.payload,
         });
         if (generation !== sessionGeneration.current) return false;
+        // The delivered trip is newest; an in-flight refresh or poll must not overwrite it.
+        requestGeneration.current += 1;
         setTrip(res.trip);
+        setLoad({ status: "ready" });
         setLastReply(res.reply);
         setPending(null);
         pollCount.current = 0;
