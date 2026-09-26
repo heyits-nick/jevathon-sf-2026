@@ -13,30 +13,32 @@ From the repository root:
 ```powershell
 npm ci --prefix photon
 npm test --prefix photon
+node --env-file=.env photon/src/receiving-line.mjs
 node --env-file=.env photon/src/index.mjs
 ```
 
-The presenter sends a text or link to the Photon project's assigned iMessage
-line. The adapter creates a backend trip on first contact and sends each
+Set `PHOTON_TEST_RECIPIENT` in the local `.env` to the presenter's approved
+iMessage phone number in international format. The receiving-line command
+looks up its assigned Photon number without changing the project or sending
+a message. If it says the presenter is not registered, register that approved
+number once with:
+
+```powershell
+node --env-file=.env photon/src/receiving-line.mjs --register-approved
+```
+
+The command prints the assigned receiving number. With the listener running,
+the presenter sends a text or link to that number. The adapter creates a
+backend trip on first contact and sends each
 inbound message to `POST /trips/{trip_id}/messages` with a stable idempotency
 ID. The backend reply is sent back in the same iMessage conversation. Only
 the backend interprets requests or chooses recommendations. An unreadable
 shared post is relayed to the backend for clarification.
 
-If the project has no recipient binding yet, shared-pool plans need a first
-conversation with the presenter. Put the presenter's own international-format
-number in local `PHOTON_TEST_RECIPIENT`. Preview the exact setup message with
-`node --env-file=.env photon/src/setup-test-thread.mjs`. Only after the owner
-explicitly approves that message, run the same command with `--send-approved`.
-This sends one setup message, without claiming the trip backend is connected.
-Do not run it automatically or send to any other recipient. Wait for the
-listener/backend readiness announcement before replying. Dedicated-line and
-shared-pool allocation details are in the official Photon routing docs. On a
-Free/Pro shared-pool project, first add the presenter's iMessage-linked handle
-under **Project → Users** in the Photon dashboard; Photon rejects sends to
-unregistered recipients. If the phone number does not match the handle Apple
+Free/Pro shared-pool projects require the presenter's iMessage-linked handle
+under **Project → Users**. If the phone number does not match the handle Apple
 uses, [Photon's debug line](https://debug.photon.codes) reports the actual
-phone or email handle.
+phone or email handle. The CLI currently registers phone numbers only.
 
 Each sender and conversation gets its own token. A duplicate delivery does
 not call the backend or send a second reply after a successful send. An
