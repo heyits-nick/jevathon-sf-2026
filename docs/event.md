@@ -16,6 +16,7 @@ as published. Coupon and invite codes are on the Notion page; they are not copie
 | Submission: HackerSquad event dashboard | https://hackersquad.io/builders/dashboard/events/cmuhxoc83006kpl0k7au0d7ro/builder |
 | Jev console (sign-up with invite link on Notion) | https://console.typesafe.ai/ |
 | Resources & AI Tools table (Notion) | https://app.notion.com/p/coderabbit/73c1bf468f2149d8b9784a549fae39b2 |
+| Cognition (Devin) credits claim page (organizer email, 12:52 PM) | https://www.trydevin.ai/jev-hackathon-with-ai-collective |
 | Participation rules | https://app.notion.com/p/coderabbit/Participation-Rules-3e796e76cda18136913cc28b087b1506 |
 | Ethical AI guidelines | https://app.notion.com/p/coderabbit/Ethical-AI-Guidelines-3e796e76cda1812db02bc02e5382b2c6 |
 | Organizer contact | hendrik@coderabbit.ai |
