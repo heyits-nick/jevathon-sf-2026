@@ -35,12 +35,7 @@ export function ScoreResult({
   return (
     <div className="space-y-6">
       {showSummary && <RestaurantSummary result={result} showName={showRestaurantName} />}
-      {result.warnings?.map((warning) => (
-        <Alert key={warning}>
-          <TriangleAlertIcon />
-          <AlertDescription>{warning}</AlertDescription>
-        </Alert>
-      ))}
+      <ScoreWarnings warnings={result.warnings} />
       <ConfidenceMeter key={runKey} result={result} />
       <TimingStats result={result} roundTripMs={roundTripMs} />
       {showTrace && <JevTrace decisions={result.decisions ?? []} evidence={evidence} costUsd={result.jev_cost_usd} />}
@@ -48,4 +43,13 @@ export function ScoreResult({
       <EvidenceList evidence={evidence} />
     </div>
   );
+}
+
+export function ScoreWarnings({ warnings }: { warnings?: string[] }) {
+  return warnings?.map((warning) => (
+    <Alert key={warning}>
+      <TriangleAlertIcon />
+      <AlertDescription>{warning}</AlertDescription>
+    </Alert>
+  ));
 }

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CheckIcon, ChevronDownIcon, ExternalLinkIcon, Loader2Icon, NavigationIcon, SearchCheckIcon, SparklesIcon } from "lucide-react";
 import { DishList } from "@/components/score/dish-list";
-import { ScoreResult } from "@/components/score/score-result";
+import { ScoreResult, ScoreWarnings } from "@/components/score/score-result";
 import { ScoreFigure, VerdictBar } from "@/components/score/verdict-bar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -175,13 +175,27 @@ export function CandidateCard({
       </div>
 
       <div className="border-t px-6 py-2 sm:px-8">
-        {expanded ? <div className="py-4">{details}</div> : <DishList dishes={result.dishes} limit={PREVIEW_DISHES} />}
-        {(hiddenDishes > 0 || expanded || candidateEvidence(candidate).length > 0) && (
-          <Button variant="ghost" size="sm" className="-ml-2 mb-2 text-muted-foreground" aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}>
-            <ChevronDownIcon className={cn("transition-transform", expanded && "rotate-180")} />
-            {expanded ? "Show less" : `Show all ${result.dishes.length} dishes, sources and timing`}
-          </Button>
+        {expanded ? (
+          <div className="py-4">{details}</div>
+        ) : (
+          <>
+            {/* The expanded details repeat these; collapsed, they stay beside the choice. */}
+            {result.warnings?.length ? (
+              <div className="space-y-2 pt-4">
+                <ScoreWarnings warnings={result.warnings} />
+              </div>
+            ) : null}
+            <DishList dishes={result.dishes} limit={PREVIEW_DISHES} />
+          </>
         )}
+        <Button variant="ghost" size="sm" className="-ml-2 mb-2 text-muted-foreground" aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}>
+          <ChevronDownIcon className={cn("transition-transform", expanded && "rotate-180")} />
+          {expanded
+            ? "Show less"
+            : hiddenDishes > 0
+              ? `Show all ${result.dishes.length} dishes, sources and timing`
+              : "Show full results"}
+        </Button>
       </div>
 
       <footer className="flex flex-wrap items-center gap-x-4 gap-y-3 border-t bg-sidebar px-6 py-4 sm:px-8">

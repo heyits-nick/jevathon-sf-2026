@@ -54,7 +54,7 @@ export function ScoreFigure({ result, size = "lg" }: { result: ScoreResponse; si
         {formatPercent(result.score)}
       </span>
       <span className={cn("text-muted-foreground", size === "lg" ? "mt-2 text-sm" : "text-xs")}>of dishes marked yes</span>
-      {size === "lg" && <span className="text-xs text-muted-foreground">Menu coverage, not a safety guarantee</span>}
+      <span className="text-xs text-muted-foreground">Menu coverage, not a safety guarantee</span>
     </div>
   );
 }
