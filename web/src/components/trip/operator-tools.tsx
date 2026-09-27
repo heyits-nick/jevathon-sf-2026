@@ -3,7 +3,6 @@
 import type { UseTrip } from "@/hooks/use-trip";
 import type { Trip } from "@/lib/api/types";
 import { Conversation } from "./conversation";
-import { SavedPosts } from "./saved-posts";
 import { TripComposer } from "./trip-composer";
 
 interface OperatorToolsProps {
@@ -17,14 +16,15 @@ interface OperatorToolsProps {
 /** Presenter controls for driving this trip from the browser. */
 export function OperatorTools({ trip, pending, onSend, onRetry, voiceSlot }: OperatorToolsProps) {
   return (
-    <details className="rounded-lg border">
-      <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
-        Presenter tools
-        <span className="ml-2 font-normal text-muted-foreground">Drive this trip from the browser</span>
-      </summary>
-      <div className="space-y-6 border-t px-4 py-4">
-        <SavedPosts saves={trip.saves} />
-        <Conversation messages={trip.messages} />
+    <section aria-labelledby="conversation-heading" className="space-y-5 rounded-3xl border bg-card p-5 sm:p-6">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 id="conversation-heading" className="font-display text-xl font-bold tracking-tight">
+          Conversation
+        </h2>
+        <span className="text-xs text-muted-foreground">iMessage · web · voice</span>
+      </div>
+      <Conversation messages={trip.messages} />
+      <div className="border-t pt-5">
         <TripComposer
           pending={pending}
           onSend={onSend}
@@ -33,6 +33,6 @@ export function OperatorTools({ trip, pending, onSend, onRetry, voiceSlot }: Ope
           voiceSlot={voiceSlot}
         />
       </div>
-    </details>
+    </section>
   );
 }

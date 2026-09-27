@@ -5,7 +5,8 @@ import { DishRow } from "./dish-row";
 const byVerdictThenConfidence = (a: Dish, b: Dish) =>
   VERDICT_ORDER[a.verdict] - VERDICT_ORDER[b.verdict] || b.confidence - a.confidence;
 
-export function DishList({ dishes }: { dishes: Dish[] }) {
+/** `limit` shows the first N dishes in the same verdict-then-confidence order. */
+export function DishList({ dishes, limit }: { dishes: Dish[]; limit?: number }) {
   if (dishes.length === 0) {
     return (
       <p className="py-8 text-center text-sm text-muted-foreground">
@@ -16,7 +17,7 @@ export function DishList({ dishes }: { dishes: Dish[] }) {
 
   return (
     <ul className="divide-y">
-      {[...dishes].sort(byVerdictThenConfidence).map((dish) => (
+      {[...dishes].sort(byVerdictThenConfidence).slice(0, limit).map((dish) => (
         <DishRow key={dish.name} dish={dish} />
       ))}
     </ul>

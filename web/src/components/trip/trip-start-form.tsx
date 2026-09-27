@@ -64,8 +64,8 @@ export function TripStartForm({ onCreate, pending, error }: TripStartFormProps) 
       <Field id="notes" label="Anything else" className="sm:col-span-2">
         <Textarea id="notes" placeholder="Walkable from DUMBO, lunch spots" value={notes} onChange={(e) => setNotes(e.target.value)} />
       </Field>
-      <div className="flex flex-col gap-3 sm:col-span-2 sm:flex-row sm:items-center">
-        <Button type="submit" disabled={pending}>
+      <div className="flex flex-col gap-3 sm:col-span-2">
+        <Button type="submit" size="lg" className="w-full" disabled={pending}>
           {pending ? <Loader2Icon className="animate-spin" /> : <PlaneTakeoffIcon />}
           {pending ? "Creating…" : "Open console"}
         </Button>
