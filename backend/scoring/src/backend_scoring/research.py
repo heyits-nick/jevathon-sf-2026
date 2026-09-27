@@ -152,6 +152,12 @@ def option_keys(candidates: list[ResearchCandidate]) -> dict[str, ResearchCandid
 async def research_shared_link(session: Session, trip: Trip, save: SavedPost) -> str:
     """Runs with the user's message and the SavedPost already committed.
     Returns the reply; persists trip status, traces, and candidates."""
+    # The newer link replaces any earlier run still waiting on the traveler.
+    for stale in session.exec(
+        select(ResearchRun).where(ResearchRun.trip_id == trip.id, ResearchRun.status.in_(("needs_place", "needs_diet")))
+    ).all():
+        stale.status = "superseded"
+        session.add(stale)
     run = ResearchRun(trip_id=trip.id, save_id=save.id, diet=trip.diet)
     trip.status = "researching"
     trip.clarification = None

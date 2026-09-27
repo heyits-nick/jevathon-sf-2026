@@ -89,7 +89,7 @@ class ResearchRun(SQLModel, table=True):
     id: str = Field(default_factory=_new_id, primary_key=True)
     trip_id: str = Field(foreign_key="trip.id", index=True)
     save_id: str = Field(foreign_key="savedpost.id", index=True)
-    # "researching" | "needs_place" | "needs_diet" | "ready" | "failed"
+    # "researching" | "needs_place" | "needs_diet" | "ready" | "failed" | "superseded"
     status: str = "researching"
     place: Optional[str] = None
     caption_excerpt: Optional[str] = None

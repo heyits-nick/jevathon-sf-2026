@@ -15,9 +15,12 @@ from collections import Counter
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlmodel import Session, select
 
 from backend_scoring import jev_client, menu_fetch_client
 from backend_scoring.jev_client import ChoiceAnswer, JevError
+from backend_scoring.models import ResearchRun, TripMessage
+from backend_scoring.storage import get_engine
 
 POST_URL = "https://www.instagram.com/reel/SAMPLE123/"
 
@@ -250,6 +253,45 @@ def test_duplicate_message_makes_no_provider_calls(client: TestClient, world: Fa
     assert dict(world.calls) == calls_after_first
 
 
+def test_text_message_is_committed_before_jev_is_asked(client: TestClient, world: FakeWorld, monkeypatch):
+    trip_id, token, _ = _researched_trip(client)
+    message_id = str(uuid.uuid4())
+    visible_to_a_duplicate = []
+
+    async def classify_intent(text, context, timeout):
+        # A duplicate delivery runs its idempotency check in its own session.
+        with Session(get_engine()) as other:
+            query = select(TripMessage).where(TripMessage.client_message_id == message_id)
+            visible_to_a_duplicate.append(other.exec(query).first() is not None)
+        return await world.classify_intent(text, context, timeout)
+
+    monkeypatch.setattr(jev_client, "classify_intent", classify_intent)
+    assert _send(client, trip_id, token, message_id, text="What did you find?").status_code == 200
+    assert visible_to_a_duplicate == [True]
+
+
+@pytest.mark.parametrize("researched", [True, False], ids=["conversation", "preferences"])
+def test_jev_outage_on_a_text_message_lets_its_retry_through(client: TestClient, world: FakeWorld, researched: bool):
+    if researched:
+        trip_id, token, _ = _researched_trip(client)
+    else:
+        trip_id, token = _create_trip(client)
+    message_id = str(uuid.uuid4())
+    text = "What did you find?" if researched else "vegan please"
+
+    world.jev_down = True
+    failed = _send(client, trip_id, token, message_id, text=text)
+    assert failed.status_code == 502
+    assert failed.json()["error"]["code"] == "PROVIDER_FAILURE"
+
+    world.jev_down = False
+    retry = _send(client, trip_id, token, message_id, text=text)
+    assert retry.status_code == 200
+    assert "Still working" not in retry.json()["reply"]
+    user_messages = [m for m in retry.json()["trip"]["messages"] if m["role"] == "user"]
+    assert [m["text"] for m in user_messages].count(text) == 1
+
+
 def test_unclear_place_asks_for_clarification_and_keeps_the_save(client: TestClient, world: FakeWorld):
     world.place_unclear = True
     trip_id, token = _create_trip(client, diet="vegetarian")
@@ -300,6 +342,41 @@ def test_missing_diet_asks_then_a_diet_reply_resumes_research(client: TestClient
     assert len(trip["recommended_candidate_ids"]) == 1
     assert world.calls["resolve_place"] == 1  # the place was not re-resolved
     assert "Updated your preferences" in resumed.json()["reply"]
+
+
+def test_a_newer_link_retires_a_run_waiting_for_a_diet(client: TestClient, world: FakeWorld):
+    trip_id, token = _create_trip(client)
+    waiting = _send(client, trip_id, token, source_url=POST_URL)
+    assert waiting.json()["trip"]["status"] == "needs_clarification"
+
+    # The diet arrives with a second share instead of as a reply.
+    second = _send(client, trip_id, token, source_url=POST_URL, text="vegetarian please")
+    assert second.json()["trip"]["status"] == "ready"
+    recommended = second.json()["trip"]["recommended_candidate_ids"]
+    searches = world.calls["search_sources"]
+
+    recall = _send(client, trip_id, token, text="What did you find?")
+    assert recall.status_code == 200
+    assert world.calls["search_sources"] == searches  # the stale run was not resumed
+    assert recall.json()["trip"]["recommended_candidate_ids"] == recommended
+    with Session(get_engine()) as session:
+        runs = session.exec(select(ResearchRun).where(ResearchRun.trip_id == trip_id)).all()
+        assert sorted(r.status for r in runs) == ["ready", "superseded"]
+
+
+def test_only_the_message_supplying_the_diet_resumes_a_waiting_run(client: TestClient, world: FakeWorld):
+    trip_id, token, body = _researched_trip(client)
+    # A waiting run left behind by a trip file from before stale runs were retired.
+    with Session(get_engine()) as session:
+        session.add(
+            ResearchRun(trip_id=trip_id, save_id=body["trip"]["saves"][0]["id"], status="needs_diet", place="18 Church Street")
+        )
+        session.commit()
+    searches = world.calls["search_sources"]
+
+    resp = _send(client, trip_id, token, text="What did you find?")
+    assert resp.status_code == 200
+    assert world.calls["search_sources"] == searches
 
 
 def test_recall_answers_from_saved_research(client: TestClient, world: FakeWorld):

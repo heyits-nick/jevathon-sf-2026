@@ -362,6 +362,22 @@ def _commit_user_message(session: Session, trip_id: str, client_message_id: str)
         )
 
 
+def _release_user_message(session: Session, trip_id: str, client_message_id: str) -> None:
+    """Undo _commit_user_message when the message fails without a reply, so
+    its retry is handled instead of being told it is still in progress."""
+    session.rollback()
+    message = session.exec(
+        select(TripMessage).where(
+            TripMessage.trip_id == trip_id,
+            TripMessage.client_message_id == client_message_id,
+            TripMessage.role == "user",
+        )
+    ).first()
+    if message is not None:
+        session.delete(message)
+        session.commit()
+
+
 async def _handle_shared_link(trip: Trip, text: str, source_url: str, client_message_id: str, session: Session) -> str:
     save = SavedPost(trip_id=trip.id, source_url=source_url, note=text)
     session.add(save)
@@ -379,6 +395,8 @@ async def _handle_shared_link(trip: Trip, text: str, source_url: str, client_mes
 
 
 async def _handle_text(trip: Trip, text: str, client_message_id: str, session: Session) -> str:
+    _commit_user_message(session, trip.id, client_message_id)
+    diet_before = trip.diet
     run, candidates = research.latest_candidates(session, trip.id)
     try:
         if not candidates:
@@ -401,17 +419,19 @@ async def _handle_text(trip: Trip, text: str, client_message_id: str, session: S
                     "I can tell you about the restaurants I researched, suggest another one, update your diet "
                     "or budget, or research a new post if you share its link."
                 )
-    except JevError:
-        raise ApiError(502, "PROVIDER_FAILURE", "Jev is unavailable.", retryable=True, trip_id=trip.id)
+    except Exception as exc:
+        _release_user_message(session, trip.id, client_message_id)
+        if isinstance(exc, JevError):
+            raise ApiError(502, "PROVIDER_FAILURE", "Jev is unavailable.", retryable=True, trip_id=trip.id) from exc
+        raise
 
-    # A place identified earlier may have been waiting only for a diet.
+    # A place identified earlier may have been waiting only for a diet, and
+    # only the message that supplies it resumes that research.
     pending = session.exec(
         select(ResearchRun)
         .where(ResearchRun.trip_id == trip.id, ResearchRun.status == "needs_diet")
         .order_by(ResearchRun.created_at.desc())
     ).first()
-    if pending is not None and trip.diet:
-        session.add(trip)
-        _commit_user_message(session, trip.id, client_message_id)
+    if pending is not None and trip.diet and not diet_before:
         reply = f"{reply} {await research.research_place(session, trip, pending)}"
     return reply
