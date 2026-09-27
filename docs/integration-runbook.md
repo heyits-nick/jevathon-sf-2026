@@ -6,7 +6,9 @@ Use Node 25. Credentials belong in ignored root `.env`; `.env.example` contains 
 
 The teammate's backend is Python/FastAPI under `backend/scoring/`. Start it from that directory with `uv sync`, then `uv run uvicorn backend_scoring.main:app --host 127.0.0.1 --port 8000 --env-file ../../.env`. Loading the root environment makes the configured Jev key available when the scoring slice lands. Point provider `API_BASE_URL` and frontend `BACKEND_API_URL` at `http://127.0.0.1:8000`; the frontend variable belongs in its ignored `web/.env.local` or server environment. Start the frontend with `npm ci --prefix web` and `npm run dev --prefix web`.
 
-The initial trip-core slice implements persistence, bearer authorization, and message idempotency. Its placeholder replies do not demonstrate research. Verify that the latest backend adds real Jev decisions, menu research, and `/score` before calling the full recommendation flow complete.
+The backend now researches a shared link inside `POST /trips/{id}/messages`: it reads the post's public caption through the menu bridge, Jev picks the place, Browserbase Search finds nearby menus, Jev selects sources, up to three menus are fetched and scored per dish by Jev, and Jev picks the recommendation. Text messages after that are routed by Jev to recall or alternative answers built from the stored research. The menu bridge must be running before the backend receives a link. The step-by-step demo sequence is in the README section "Reproducible demo: shared link → researched recommendation".
+
+Research runs inside the request (budget `RESEARCH_BUDGET_SECONDS`, default 45, inside Photon's 55 s and voice's 50 s waits). A backend crash mid-run can leave a trip in `researching`; share the link again with a new message to retry. A reply to a place clarification does not restart research yet; share the link again instead.
 
 Jev readiness was verified with the documented read-only models endpoint on September 26. The evaluation endpoint is `POST https://api.typesafe.ai/v1/systemone`, with bearer auth and `{state, model: "jev-latest", questions}`. Use a Choice question with explicit `yes`, `no`, and `unclear` criteria for dietary verdicts. Noul has no confidence field, and Score is a rubric index. Put the question and evidence boundaries in instructions, not just the question-map key. See the [official API reference](https://docs.typesafe.ai/api).
 
@@ -50,7 +52,7 @@ For the Next frontend, mount the module as described in [the voice README](../vo
 ## Final integration check
 
 1. Backend answers authorized `GET /trips/{id}` and `POST /trips/{id}/messages`; `POST /score` remains compatible.
-2. Real menu research returns original source evidence and the backend's actual Jev decisions.
+2. A shared post link on a trip with a diet reaches `ready` with candidates, one recommended candidate ID, and a decision trace per Jev call; `GET /trips/{id}` returns the same after a web refresh. Real menu research returns original source evidence and the backend's actual Jev decisions.
 3. A presenter-initiated iMessage saves input and receives the backend reply.
 4. Web and voice are paired to that same stored trip; no separate recommendation memory.
 5. Voice recalls the saved context through the backend; refresh/restart preserves the trip.

@@ -110,3 +110,38 @@ capability to escalate to, so `/score` always returns `escalated: false`.
 Point `web/` at it locally via `web/.env.local`: `BACKEND_API_URL=http://localhost:8000`.
 
 Provider startup and live verification are documented in the integration runbook above.
+
+### Reproducible demo: shared link → researched recommendation
+
+Needs `TYPESAFE_API_KEY` and `BROWSERBASE_API_KEY` in the root `.env`. From the repo root, in two
+terminals:
+
+```bash
+node --env-file=.env backend/menu_fetch/cli.mjs serve            # Browserbase bridge, :8101
+cd backend/scoring && uv run uvicorn backend_scoring.main:app --host 127.0.0.1 --port 8000 --env-file ../../.env
+```
+
+Then drive one trip (bash; needs `jq`):
+
+```bash
+API=http://127.0.0.1:8000
+read TRIP TOKEN < <(curl -s -X POST $API/trips -H 'Content-Type: application/json' \
+  -d '{"destination":"New York","preferences":{"diet":"vegetarian"}}' | jq -r '"\(.trip_id) \(.access_token)"')
+say() { curl -s -X POST $API/trips/$TRIP/messages -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d "{\"client_message_id\":\"$(python3 -c 'import uuid; print(uuid.uuid4())')\",$1}" | jq -r .reply; }
+say '"source_url":"https://www.instagram.com/reel/DdouiWwP1oe/"'   # research runs inside this request (~5–45 s)
+curl -s $API/trips/$TRIP -H "Authorization: Bearer $TOKEN" | jq '{status, recommended_candidate_ids, candidates: [.candidates[].restaurant], decisions: (.decisions | length)}'
+say '"text":"What did you find for me?"'      # recall from saved research
+say '"text":"Is it open late?"'               # research can't answer -> says so
+say '"text":"I don'"'"'t like that one"'      # alternative from the same research
+```
+
+Expected: status `ready`, the place read from the post caption, up to three nearby menus checked
+by Jev, one Jev recommendation, and a decision trace per Jev call. If Jev returns `unclear` for the
+place, the trip is `needs_clarification`; if the trip has no diet, it asks for one and resumes
+research when you reply with it. If the post page can't be read, it asks which place to research;
+a Jev or search failure shows as status `failed`. The save is kept in every case.
+To see the same trip in the dashboard, set `BACKEND_API_URL=http://127.0.0.1:8000` in
+`web/.env.local`, run `npm ci --prefix web && npm run dev --prefix web`, and resume the trip with
+`$TRIP` and `$TOKEN`. For voice, run `node --env-file=.env voice/server.mjs` and follow the voice
+section of the runbook. Research tuning: `RESEARCH_BUDGET_SECONDS` (default 45).
