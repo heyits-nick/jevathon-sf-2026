@@ -79,3 +79,38 @@ class DecisionTrace(SQLModel, table=True):
     evidence_ids: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     duration_ms: int
     created_at: datetime = Field(default_factory=_now)
+
+
+class ResearchRun(SQLModel, table=True):
+    """One automatic research attempt for a saved post. New table only — no
+    existing table is altered, so older SQLite trip files keep working
+    (`create_all` adds missing tables, never columns)."""
+
+    id: str = Field(default_factory=_new_id, primary_key=True)
+    trip_id: str = Field(foreign_key="trip.id", index=True)
+    save_id: str = Field(foreign_key="savedpost.id", index=True)
+    # "researching" | "needs_place" | "needs_diet" | "ready" | "failed"
+    status: str = "researching"
+    place: Optional[str] = None
+    caption_excerpt: Optional[str] = None
+    diet: Optional[str] = None
+    warnings: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    created_at: datetime = Field(default_factory=_now)
+    finished_at: Optional[datetime] = None
+
+
+class ResearchCandidate(SQLModel, table=True):
+    """A researched restaurant, serialized as the contract's `Candidate`.
+    `rank` is Jev's ordering (0 = recommendation); None = not recommended."""
+
+    id: str = Field(default_factory=_new_id, primary_key=True)
+    trip_id: str = Field(foreign_key="trip.id", index=True)
+    run_id: str = Field(foreign_key="researchrun.id", index=True)
+    restaurant: str
+    menu_url: str
+    score_result: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    evidence: list[dict] = Field(default_factory=list, sa_column=Column(JSON))
+    recommendation_reason: Optional[str] = None
+    rank: Optional[int] = None
+    rejected: bool = False
+    created_at: datetime = Field(default_factory=_now)

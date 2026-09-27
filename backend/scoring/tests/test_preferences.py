@@ -203,7 +203,7 @@ def test_message_with_no_preference_keywords_never_calls_jev(client: TestClient,
         json={"client_message_id": str(uuid.uuid4()), "text": "what time do you open"},
     )
     assert resp.status_code == 200
-    assert "later update" in resp.json()["reply"]
+    assert "Share a link" in resp.json()["reply"]
 
 
 def test_clarification_clears_once_a_later_message_updates_preferences(client: TestClient, monkeypatch):
