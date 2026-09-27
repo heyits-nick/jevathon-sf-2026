@@ -1,0 +1,376 @@
+"""Automatic link research and recall/alternative replies, end to end through
+POST /trips/{id}/messages.
+
+FAKE PROVIDERS: every Browserbase (menu_fetch_client) and Jev (jev_client)
+response in this file is labeled sample data installed by the `world`
+fixture. Nothing here is a live result; the live check is manual (see
+docs/integration-runbook.md). The fakes answer from the question content
+they receive, so the tests exercise the real pipeline code: caption
+extraction, capability filtering, validation of Jev's choices, persistence,
+and serialization.
+"""
+
+import uuid
+from collections import Counter
+
+import pytest
+from fastapi.testclient import TestClient
+
+from backend_scoring import jev_client, menu_fetch_client
+from backend_scoring.jev_client import ChoiceAnswer, JevError
+
+POST_URL = "https://www.instagram.com/reel/SAMPLE123/"
+
+# Sample (fake) public post page, shaped like the bridge's markdown raw_text.
+SAMPLE_POST_PAGE = "\n".join(
+    [
+        "[![sample_brand](https://example.com/avatar.jpg)](https://www.instagram.com/sample_brand/)",
+        "sample_brand",
+        "Edited•3d",
+        "Free tote bag giveaway today at 18 Church Street, come say hi!",
+        "Load more comments",
+        "some_commenter nice!",
+    ]
+)
+
+# Sample (fake) Browserbase Search results.
+SAMPLE_RESULTS = [
+    {"id": "r1", "title": "Green Leaf Cafe Menu", "url": "https://greenleaf.example/menu", "snippet": "Veggie bowls $14"},
+    {"id": "r2", "title": "Stone Grill Menu", "url": "https://stonegrill.example/menu", "snippet": "Steaks and salads"},
+    {"id": "r3", "title": "Best lunch spots downtown", "url": "https://news.example/best-lunch", "snippet": "Our list"},
+    {"id": "r4", "title": "Green Leaf Cafe PDF menu", "url": "https://greenleaf.example/menu.pdf", "snippet": "PDF"},
+    {"id": "r5", "title": "Stone Grill delivery", "url": "https://www.doordash.com/store/stone-grill", "snippet": "Order"},
+]
+
+# Sample (fake) menus returned by the menu fetch bridge.
+SAMPLE_MENUS = {
+    "https://greenleaf.example/menu": [
+        ("Veggie Bowl", "brown rice, roasted vegetables"),
+        ("Tofu Curry", "tofu, coconut, vegetables"),
+        ("Beef Burger", "beef patty, cheddar"),
+    ],
+    "https://stonegrill.example/menu": [
+        ("Ribeye Steak", "12oz ribeye"),
+        ("Garden Salad", "greens, tomato, cucumber"),
+    ],
+}
+MEAT_WORDS = ("beef", "steak", "ribeye", "chicken")
+
+
+def _answer(choice: str, confidence: float = 0.9, probabilities: dict | None = None) -> ChoiceAnswer:
+    return ChoiceAnswer(choice=choice, confidence=confidence, duration_ms=40, probabilities=probabilities)
+
+
+def _page(url: str, restaurant: str) -> dict:
+    if url == POST_URL:
+        return {"restaurant": "", "menu_url": url, "raw_text": SAMPLE_POST_PAGE, "dishes": [], "evidence": []}
+    dishes, evidence = [], []
+    for i, (name, description) in enumerate(SAMPLE_MENUS[url], start=1):
+        evidence.append(
+            {"id": f"e{i}", "url": url, "quote": f"{name} {description}", "kind": "menu", "checked_at": "2026-09-26T12:00:00Z"}
+        )
+        dishes.append({"name": name, "description": description, "evidence_ids": [f"e{i}"]})
+    return {"restaurant": restaurant, "menu_url": url, "raw_text": "sample", "dishes": dishes, "evidence": evidence}
+
+
+class FakeWorld:
+    """Labeled fake providers. `calls` counts every provider call; flags
+    switch individual Jev decisions to unclear/outage."""
+
+    def __init__(self) -> None:
+        self.calls: Counter = Counter()
+        self.place_unclear = False
+        self.jev_down = False
+        self.searched_urls: list[str] = []
+
+    def _jev(self, name: str) -> None:
+        self.calls[name] += 1
+        if self.jev_down:
+            raise JevError("Sample outage: Jev unavailable.")
+
+    # --- Browserbase bridge fakes ---
+    async def fetch_menu(self, url, restaurant, timeout=None):
+        self.calls["fetch_menu"] += 1
+        return _page(url, restaurant)
+
+    async def search_sources(self, query, limit=5, timeout=None):
+        self.calls["search_sources"] += 1
+        return {"query": query, "results": SAMPLE_RESULTS[:limit]}
+
+    # --- Jev fakes ---
+    async def resolve_place(self, caption, candidates, timeout):
+        self._jev("resolve_place")
+        assert "Load more comments" not in caption and "some_commenter" not in caption
+        if self.place_unclear:
+            return _answer("unclear", 0.7), {i: _answer("unclear", 0.6) for i in range(len(candidates))}
+        return _answer("yes"), {i: _answer("yes" if c == "18 Church Street" else "no") for i, c in enumerate(candidates)}
+
+    async def select_sources(self, place, diet, results, timeout):
+        self._jev("select_sources")
+        self.searched_urls = [r["url"] for r in results]
+        return {i: (_answer("yes" if r["url"].endswith("/menu") else "no"), None) for i, r in enumerate(results)}
+
+    async def score_dishes(self, diet, dishes, timeout=None):
+        self._jev("score_dishes")
+        text = lambda d: f"{d['name']} {d.get('description', '')}".lower()  # noqa: E731
+        return [_answer("no" if any(w in text(d) for w in MEAT_WORDS) else "yes") for d in dishes]
+
+    async def choose_recommendation(self, place, preferences, summaries, timeout):
+        self._jev("choose_recommendation")
+        keys = sorted(summaries, key=lambda k: not summaries[k].startswith("Green Leaf"))
+        return _answer(keys[0], 0.85, {k: (0.85 if k == keys[0] else 0.15) for k in keys})
+
+    async def classify_intent(self, text, context, timeout):
+        self._jev("classify_intent")
+        lowered = text.lower()
+        if "don't like" in lowered or "another" in lowered:
+            return _answer("alternative")
+        if "?" in lowered:
+            return _answer("recall")
+        return _answer("other")
+
+    async def choose_recall(self, text, summaries, timeout):
+        self._jev("choose_recall")
+        if "open" in text.lower():  # hours are not in menu research
+            return _answer("none", 0.9)
+        return _answer("all", 0.9)
+
+    async def choose_rejected(self, text, labels, timeout):
+        self._jev("choose_rejected")
+        return _answer(next(k for k, label in labels.items() if "currently recommended" in label), 0.9)
+
+    async def confirm_preference_candidates(self, text, candidates):
+        self._jev("confirm_preference_candidates")
+        return {field: _answer("yes", 0.95) for field in candidates}
+
+
+@pytest.fixture()
+def world(monkeypatch) -> FakeWorld:
+    fake = FakeWorld()
+    monkeypatch.setattr(menu_fetch_client, "fetch_menu", fake.fetch_menu)
+    monkeypatch.setattr(menu_fetch_client, "search_sources", fake.search_sources)
+    for name in (
+        "resolve_place",
+        "select_sources",
+        "score_dishes",
+        "choose_recommendation",
+        "classify_intent",
+        "choose_recall",
+        "choose_rejected",
+        "confirm_preference_candidates",
+    ):
+        monkeypatch.setattr(jev_client, name, getattr(fake, name))
+    return fake
+
+
+def _create_trip(client: TestClient, **preferences) -> tuple[str, str]:
+    resp = client.post("/trips", json={"destination": "New York", "preferences": preferences})
+    assert resp.status_code == 201
+    body = resp.json()
+    return body["trip_id"], body["access_token"]
+
+
+def _auth(token: str) -> dict:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _send(client: TestClient, trip_id: str, token: str, message_id: str | None = None, **body):
+    body["client_message_id"] = message_id or str(uuid.uuid4())
+    return client.post(f"/trips/{trip_id}/messages", headers=_auth(token), json=body)
+
+
+def _researched_trip(client: TestClient) -> tuple[str, str, dict]:
+    trip_id, token = _create_trip(client, diet="vegetarian")
+    resp = _send(client, trip_id, token, source_url=POST_URL)
+    assert resp.status_code == 200
+    return trip_id, token, resp.json()
+
+
+def _by_name(trip: dict) -> dict[str, dict]:
+    return {c["restaurant"]: c for c in trip["candidates"]}
+
+
+def test_shared_link_is_researched_to_ready_and_persisted(client: TestClient, world: FakeWorld):
+    trip_id, token, body = _researched_trip(client)
+    trip = body["trip"]
+
+    assert trip["status"] == "ready"
+    assert trip["saves"][0]["source_url"] == POST_URL
+    assert trip["saves"][0]["place_name"] == "18 Church Street"
+
+    # Capability filter: the PDF and the JS delivery app never reach Jev.
+    assert "https://greenleaf.example/menu.pdf" not in world.searched_urls
+    assert not any("doordash" in url for url in world.searched_urls)
+    assert "https://news.example/best-lunch" in world.searched_urls  # Jev said no to it, not code
+
+    candidates = _by_name(trip)
+    assert set(candidates) == {"Green Leaf Cafe", "Stone Grill"}
+    green = candidates["Green Leaf Cafe"]
+    assert trip["recommended_candidate_ids"] == [green["id"]]
+    assert trip["candidates"][0]["id"] == green["id"]  # recommendation serialized first
+    assert "Jev's pick" in green["recommendation_reason"]
+    assert [d["verdict"] for d in green["score_result"]["dishes"]] == ["yes", "yes", "no"]
+    # Evidence IDs are namespaced per candidate and dishes point at them.
+    evidence_ids = {e["id"] for e in green["evidence"]}
+    assert all(eid in evidence_ids for d in green["score_result"]["dishes"] for eid in d["evidence_ids"])
+    assert not evidence_ids & {e["id"] for e in candidates["Stone Grill"]["evidence"]}
+
+    stages = Counter(d["stage"] for d in trip["decisions"])
+    assert stages["place:single_location"] == 1
+    assert stages["source_selection"] == 3  # one per readable search result
+    assert stages["dish_scoring"] == 2
+    assert stages["recommendation"] == 1
+    assert "Green Leaf Cafe" in body["reply"] and "18 Church Street" in body["reply"]
+
+    # Everything survives a fresh read (a dashboard refresh).
+    reread = client.get(f"/trips/{trip_id}", headers=_auth(token)).json()
+    assert reread["status"] == "ready"
+    assert reread["recommended_candidate_ids"] == [green["id"]]
+    assert {c["id"] for c in reread["candidates"]} == {c["id"] for c in trip["candidates"]}
+    assert len(reread["decisions"]) == len(trip["decisions"])
+    assert [m["role"] for m in reread["messages"]] == ["user", "assistant"]
+
+
+def test_duplicate_message_makes_no_provider_calls(client: TestClient, world: FakeWorld):
+    trip_id, token = _create_trip(client, diet="vegetarian")
+    message_id = str(uuid.uuid4())
+    first = _send(client, trip_id, token, message_id, source_url=POST_URL)
+    assert first.status_code == 200
+    calls_after_first = dict(world.calls)
+
+    replay = _send(client, trip_id, token, message_id, source_url=POST_URL)
+    assert replay.status_code == 200
+    assert replay.json()["reply"] == first.json()["reply"]
+    assert dict(world.calls) == calls_after_first
+    assert len(replay.json()["trip"]["saves"]) == 1
+
+    conflict = _send(client, trip_id, token, message_id, source_url="https://www.instagram.com/reel/OTHER/")
+    assert conflict.status_code == 409
+    assert conflict.json()["error"]["code"] == "IDEMPOTENCY_CONFLICT"
+    assert dict(world.calls) == calls_after_first
+
+
+def test_unclear_place_asks_for_clarification_and_keeps_the_save(client: TestClient, world: FakeWorld):
+    world.place_unclear = True
+    trip_id, token = _create_trip(client, diet="vegetarian")
+    resp = _send(client, trip_id, token, source_url=POST_URL)
+
+    assert resp.status_code == 200
+    trip = resp.json()["trip"]
+    assert trip["status"] == "needs_clarification"
+    assert trip["clarification"] and "Which place" in trip["clarification"]
+    assert len(trip["saves"]) == 1 and trip["saves"][0]["place_name"] is None
+    assert trip["candidates"] == []
+    assert world.calls["search_sources"] == 0
+    assert world.calls["select_sources"] == 0
+    assert any(d["stage"] == "place:single_location" and d["choice"] == "unclear" for d in trip["decisions"])
+
+
+def test_jev_outage_fails_visibly_and_keeps_the_save(client: TestClient, world: FakeWorld):
+    world.jev_down = True
+    trip_id, token = _create_trip(client, diet="vegetarian")
+    resp = _send(client, trip_id, token, source_url=POST_URL)
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["trip"]["status"] == "failed"
+    assert "Jev" in body["reply"] and "unavailable" in body["reply"]
+    assert len(body["trip"]["saves"]) == 1
+    assert body["trip"]["candidates"] == [] and body["trip"]["decisions"] == []
+    assert world.calls["search_sources"] == 0
+
+    reread = client.get(f"/trips/{trip_id}", headers=_auth(token)).json()
+    assert reread["status"] == "failed" and len(reread["saves"]) == 1
+
+
+def test_missing_diet_asks_then_a_diet_reply_resumes_research(client: TestClient, world: FakeWorld):
+    trip_id, token = _create_trip(client)
+    first = _send(client, trip_id, token, source_url=POST_URL)
+    trip = first.json()["trip"]
+    assert trip["status"] == "needs_clarification"
+    assert "18 Church Street" in trip["clarification"] and "dietary" in trip["clarification"]
+    assert world.calls["search_sources"] == 0
+
+    resumed = _send(client, trip_id, token, text="vegetarian please")
+    assert resumed.status_code == 200
+    trip = resumed.json()["trip"]
+    assert trip["preferences"]["diet"] == "vegetarian"
+    assert trip["status"] == "ready"
+    assert trip["clarification"] is None
+    assert len(trip["recommended_candidate_ids"]) == 1
+    assert world.calls["resolve_place"] == 1  # the place was not re-resolved
+    assert "Updated your preferences" in resumed.json()["reply"]
+
+
+def test_recall_answers_from_saved_research(client: TestClient, world: FakeWorld):
+    trip_id, token, _ = _researched_trip(client)
+    searches = world.calls["search_sources"]
+
+    resp = _send(client, trip_id, token, text="What did you find for me?")
+    assert resp.status_code == 200
+    reply = resp.json()["reply"]
+    assert "Green Leaf Cafe (current recommendation)" in reply
+    assert "Stone Grill" in reply and "https://greenleaf.example/menu" in reply
+    assert world.calls["search_sources"] == searches  # recall never re-researches
+    stages = [d["stage"] for d in resp.json()["trip"]["decisions"]]
+    assert "intent" in stages and "recall" in stages
+
+
+def test_recall_says_none_when_research_cannot_answer(client: TestClient, world: FakeWorld):
+    trip_id, token, _ = _researched_trip(client)
+    resp = _send(client, trip_id, token, text="Is Green Leaf open late?")
+    assert resp.status_code == 200
+    reply = resp.json()["reply"]
+    assert reply.startswith("My saved research doesn't answer that.")
+    assert "Green Leaf Cafe" in reply and "Stone Grill" in reply
+
+
+def test_alternative_sets_aside_the_recommendation(client: TestClient, world: FakeWorld):
+    trip_id, token, body = _researched_trip(client)
+    ids = {name: c["id"] for name, c in _by_name(body["trip"]).items()}
+
+    resp = _send(client, trip_id, token, text="I don't like that one")
+    assert resp.status_code == 200
+    reply = resp.json()["reply"]
+    assert reply.startswith("Okay, setting aside Green Leaf Cafe.")
+    assert "Stone Grill" in reply and "https://stonegrill.example/menu" in reply
+
+    trip = client.get(f"/trips/{trip_id}", headers=_auth(token)).json()
+    assert trip["recommended_candidate_ids"] == [ids["Stone Grill"]]
+    assert "set this one aside" in _by_name(trip)["Green Leaf Cafe"]["recommendation_reason"]
+    stages = [d["stage"] for d in trip["decisions"]]
+    assert "rejected_candidate" in stages and "alternative" in stages
+
+    # Setting aside the last eligible one says so instead of inventing a pick.
+    resp = _send(client, trip_id, token, text="I don't like that one either")
+    assert "None of the other researched menus" in resp.json()["reply"]
+    assert client.get(f"/trips/{trip_id}", headers=_auth(token)).json()["recommended_candidate_ids"] == []
+
+
+def test_selected_candidate_must_belong_to_the_trip(client: TestClient, world: FakeWorld):
+    trip_id, token, body = _researched_trip(client)
+    other_trip_id, other_token, other_body = _researched_trip(client)
+    own_id = body["trip"]["candidates"][1]["id"]
+
+    resp = _send(client, trip_id, token, selected_candidate_id=own_id)
+    assert resp.status_code == 200
+    assert resp.json()["trip"]["selected_candidate_id"] == own_id
+    assert resp.json()["reply"].startswith("Saved your choice:")
+
+    for bad_id in (str(uuid.uuid4()), other_body["trip"]["candidates"][0]["id"]):
+        resp = _send(client, trip_id, token, selected_candidate_id=bad_id)
+        assert resp.status_code == 422
+        assert resp.json()["error"]["code"] == "UNKNOWN_CANDIDATE"
+    assert client.get(f"/trips/{trip_id}", headers=_auth(token)).json()["selected_candidate_id"] == own_id
+
+
+def test_messages_require_the_trip_token(client: TestClient, world: FakeWorld):
+    trip_id, _ = _create_trip(client, diet="vegetarian")
+    _, other_token = _create_trip(client)
+    body = {"client_message_id": str(uuid.uuid4()), "source_url": POST_URL}
+
+    assert client.post(f"/trips/{trip_id}/messages", json=body).status_code == 401
+    resp = client.post(f"/trips/{trip_id}/messages", headers=_auth(other_token), json=body)
+    assert resp.status_code == 403
+    assert resp.json()["error"]["code"] == "FORBIDDEN"
+    assert sum(world.calls.values()) == 0
