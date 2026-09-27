@@ -15,7 +15,7 @@ export function ConfidenceBar({ value, tone, className }: ConfidenceBarProps) {
       <Progress
         value={value * 100}
         aria-label="Confidence"
-        className="flex-1"
+        className="flex-1 [&_[data-slot=progress-track]]:h-1.5"
         indicatorClassName={cn("duration-700 ease-out", TONE_BG[tone])}
       />
       <span className="w-9 text-right text-xs text-muted-foreground tabular-nums">{formatPercent(value)}</span>

@@ -47,7 +47,7 @@ function Count({ value, label, tone }: { value: number; label: string; tone: str
   );
 }
 
-function countDishes({ dishes }: ScoreResponse) {
+export function countDishes({ dishes }: ScoreResponse) {
   return dishes.reduce(
     (acc, dish) => {
       const { uncertain } = getVerdictDisplay(dish);

@@ -41,11 +41,11 @@ export function TripComposer({ pending, onSend, onRetry, clarification, voiceSlo
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <Field id="message" label={clarification ? "Your answer" : "Message"}>
         <Textarea
           id="message"
-          placeholder={clarification ? "Answer the question above" : "Save this for lunch; vegetarian, near DUMBO."}
+          placeholder={clarification ? "Answer the question above" : "Ask what Jev found, or set aside a place"}
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
@@ -60,7 +60,7 @@ export function TripComposer({ pending, onSend, onRetry, clarification, voiceSlo
         />
       </Field>
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" disabled={sending || !canSend}>
+        <Button type="submit" size="lg" className="flex-1" disabled={sending || !canSend}>
           {sending ? <Loader2Icon className="animate-spin" /> : <SendIcon />}
           {sending ? "Sending…" : "Send"}
         </Button>

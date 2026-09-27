@@ -19,6 +19,8 @@ interface ScoreResultProps {
   showRestaurantName?: boolean;
   /** Trip cards already show the trip-level rail; keep this for the standalone score page. */
   showTrace?: boolean;
+  /** Hide the headline summary when the surrounding card already shows the score and counts. */
+  showSummary?: boolean;
 }
 
 export function ScoreResult({
@@ -28,10 +30,11 @@ export function ScoreResult({
   evidence = result.evidence ?? [],
   showRestaurantName = true,
   showTrace = true,
+  showSummary = true,
 }: ScoreResultProps) {
   return (
     <div className="space-y-6">
-      <RestaurantSummary result={result} showName={showRestaurantName} />
+      {showSummary && <RestaurantSummary result={result} showName={showRestaurantName} />}
       {result.warnings?.map((warning) => (
         <Alert key={warning}>
           <TriangleAlertIcon />

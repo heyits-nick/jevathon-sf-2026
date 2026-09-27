@@ -9,7 +9,7 @@ export function ScoreApp({ initialState }: { initialState?: ScoreState }) {
   const { state, submit } = useScore(initialState);
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-5xl space-y-6">
       <Card>
         <CardContent>
           <ScoreForm onSubmit={submit} loading={state.status === "loading"} />

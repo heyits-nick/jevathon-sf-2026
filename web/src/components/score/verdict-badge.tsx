@@ -11,7 +11,7 @@ export function VerdictBadge({ verdict, confidence }: Pick<Dish, "verdict" | "co
   const Icon = uncertain ? CircleHelpIcon : VERDICT_ICON[verdict];
 
   return (
-    <Badge variant="outline" className={cn("border-transparent", TONE_SOFT_BG[tone], TONE_TEXT[tone])}>
+    <Badge variant="outline" className={cn("h-6 border-transparent px-2.5 font-semibold", TONE_SOFT_BG[tone], TONE_TEXT[tone])}>
       <Icon data-icon="inline-start" />
       {label}
     </Badge>

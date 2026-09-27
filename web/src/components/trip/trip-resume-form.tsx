@@ -46,13 +46,12 @@ export function TripResumeForm() {
   };
 
   return (
-    <form onSubmit={submit} className="mt-6 space-y-3 border-t pt-5">
-      <p className="text-sm font-medium">Open an existing trip from iMessage</p>
-      <p className="text-sm text-muted-foreground">Enter the trip ID and access token from the presenter pairing file.</p>
+    <form onSubmit={submit} className="space-y-3">
+      <p className="text-sm text-muted-foreground">Choose the presenter pairing file, or enter the trip ID and access token from it.</p>
       <Input aria-label="Presenter pairing JSON file" type="file" accept="application/json,.json" onChange={(event) => { void importFile(event.target.files?.[0]); }} />
       <Input aria-label="Existing trip ID" autoComplete="off" required value={tripId} onChange={(event) => setTripId(event.target.value)} placeholder="Trip ID" />
       <Input aria-label="Existing trip access token" type="password" autoComplete="off" required value={token} onChange={(event) => setToken(event.target.value)} placeholder="Access token" />
-      <Button type="submit" disabled={pending}>{pending ? "Opening…" : "Open trip"}</Button>
+      <Button type="submit" size="lg" className="w-full" disabled={pending}>{pending ? "Opening…" : "Open trip"}</Button>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     </form>
   );
