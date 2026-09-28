@@ -241,6 +241,8 @@ async def _identify_place(
 
 
 async def research_place(session: Session, trip: Trip, run: ResearchRun, budget: Budget | None = None) -> str:
+    if _newer_run_exists(session, run):
+        return _set_aside(session, run)
     budget = budget or Budget(budget_seconds())
     place, diet = run.place, trip.diet
     run.diet = diet
@@ -385,14 +387,19 @@ async def _research_place(session: Session, trip: Trip, run: ResearchRun, budget
     if not candidates:
         return _failed(session, trip, run, f"I identified {place}, but none of the menus I found could be checked. " + _warning_text(warnings), warnings)
 
+    for candidate in candidates:
+        session.add(candidate)
+    kept = f" The menus I checked for {place} are saved with the trip."
+    if _newer_run_exists(session, run):
+        return _set_aside(session, run, kept)
+
     # 3. Jev chooses the recommendation among eligible researched IDs.
     for older in session.exec(
         select(ResearchCandidate).where(ResearchCandidate.trip_id == trip.id, ResearchCandidate.rank.is_not(None))
     ).all():
         older.rank = None
         session.add(older)
-    for candidate in candidates:
-        session.add(candidate)
+    session.commit()  # hold no SQLite write lock while Jev chooses
 
     reply = f"From the post's caption I identified {place}. I checked {len(candidates)} nearby menu(s) for {diet} options. "
     try:
@@ -400,6 +407,13 @@ async def _research_place(session: Session, trip: Trip, run: ResearchRun, budget
     except (JevError, BudgetExhausted):
         warnings.append("Jev could not complete the recommendation step; the checked menus are saved without a pick.")
         reply += "Jev couldn't finish choosing a recommendation, so the checked menus are saved without a pick. "
+
+    if _newer_run_exists(session, run):
+        for candidate in candidates:
+            candidate.rank = None
+            candidate.recommendation_reason = None
+            session.add(candidate)
+        return _set_aside(session, run, kept)
 
     run.status = "ready"
     run.finished_at = _now()
@@ -479,7 +493,29 @@ def _warning_text(warnings: list[str]) -> str:
     return ("Couldn't use: " + "; ".join(warnings) + ".") if warnings else ""
 
 
+def _newer_run_exists(session: Session, run: ResearchRun) -> bool:
+    """A link shared after this run started owns the trip's status,
+    clarification and ranking; this run must no longer write them."""
+    newest = session.exec(
+        select(ResearchRun).where(ResearchRun.trip_id == run.trip_id).order_by(ResearchRun.created_at.desc())
+    ).first()
+    return newest is not None and newest.id != run.id
+
+
+def _set_aside(session: Session, run: ResearchRun, detail: str = "") -> str:
+    run.status = "superseded"
+    run.finished_at = _now()
+    session.add(run)
+    session.commit()
+    return (
+        "You shared a newer link while I was working on this one, so I'm going with the newer link."
+        f"{detail} Share this link again if you want it researched."
+    )
+
+
 def _needs_clarification(session: Session, trip: Trip, run: ResearchRun, status: str, question: str) -> str:
+    if _newer_run_exists(session, run):
+        return _set_aside(session, run)
     run.status = status
     run.finished_at = _now()
     trip.status = "needs_clarification"
@@ -494,8 +530,9 @@ def _failed(session: Session, trip: Trip, run: ResearchRun, reply: str, warnings
     run.status = "failed"
     run.finished_at = _now()
     run.warnings = warnings or []
-    trip.status = "failed"
     session.add(run)
-    session.add(trip)
+    if not _newer_run_exists(session, run):
+        trip.status = "failed"
+        session.add(trip)
     session.commit()
     return reply

@@ -10,9 +10,11 @@ extraction, capability filtering, validation of Jev's choices, persistence,
 and serialization.
 """
 
+import asyncio
 import uuid
 from collections import Counter
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
@@ -377,6 +379,70 @@ def test_only_the_message_supplying_the_diet_resumes_a_waiting_run(client: TestC
     resp = _send(client, trip_id, token, text="What did you find?")
     assert resp.status_code == 200
     assert world.calls["search_sources"] == searches
+
+
+@pytest.mark.parametrize(
+    ("held", "outcome"),
+    [
+        ("resolve_place", "proceeds"),
+        ("resolve_place", "unclear"),
+        ("select_sources", "fails"),
+        ("score_dishes", "proceeds"),
+        ("choose_recommendation", "proceeds"),
+    ],
+)
+def test_a_newer_link_wins_over_older_research_still_running(
+    client: TestClient, world: FakeWorld, monkeypatch, held: str, outcome: str
+):
+    """Two links on one trip, in one event loop: the older request's first
+    `held` Jev call waits until the newer link's research has finished."""
+    from backend_scoring.main import app
+
+    trip_id, token = _create_trip(client, diet="vegetarian")
+    reached, release = asyncio.Event(), asyncio.Event()
+    original = getattr(jev_client, held)
+    calls = 0
+
+    async def hold_first_call(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            reached.set()
+            await release.wait()
+            if outcome == "fails":
+                raise JevError("Sample outage after the newer link finished.")
+            world.place_unclear = outcome == "unclear"
+        return await original(*args, **kwargs)
+
+    monkeypatch.setattr(jev_client, held, hold_first_call)
+
+    async def older_then_newer():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as http:
+
+            def share_link():
+                body = {"client_message_id": str(uuid.uuid4()), "source_url": POST_URL}
+                return http.post(f"/trips/{trip_id}/messages", headers=_auth(token), json=body)
+
+            older = asyncio.create_task(share_link())
+            await reached.wait()
+            newer = await share_link()
+            release.set()
+            return await older, newer
+
+    older, newer = asyncio.run(older_then_newer())
+    assert older.status_code == 200 and newer.status_code == 200
+    assert newer.json()["trip"]["status"] == "ready"
+    if outcome != "fails":
+        assert "newer link" in older.json()["reply"]
+
+    trip = client.get(f"/trips/{trip_id}", headers=_auth(token)).json()
+    assert trip["status"] == "ready" and trip["clarification"] is None
+    assert trip["recommended_candidate_ids"] == newer.json()["trip"]["recommended_candidate_ids"]
+    with Session(get_engine()) as session:
+        runs = session.exec(
+            select(ResearchRun).where(ResearchRun.trip_id == trip_id).order_by(ResearchRun.created_at)
+        ).all()
+        assert [r.status for r in runs] == ["failed" if outcome == "fails" else "superseded", "ready"]
 
 
 def test_recall_answers_from_saved_research(client: TestClient, world: FakeWorld):
