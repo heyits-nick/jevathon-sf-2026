@@ -7,10 +7,16 @@ test('rejects private and malformed sources', async () => {
     await assert.rejects(validatePublicUrl(url));
   }
   await assert.rejects(validatePublicUrl('https://restaurant.example/menu', async () => [{ address: '10.1.2.3' }]));
-  for (const address of ['192.0.2.1', '198.51.100.5', '203.0.113.9']) {
+  for (const address of ['192.0.2.1', '198.51.100.5', '203.0.113.9', '192.88.99.1']) {
     await assert.rejects(validatePublicUrl(`http://${address}/menu`));
   }
+  // 6to4 and Teredo addresses embed an IPv4 address, e.g. 127.0.0.1 or 169.254.169.254.
+  for (const address of ['2002:7f00:1::', '2002:a9fe:a9fe::', '2001:0:4136:e378:8000:63bf:3fff:fdd2', '2001::1']) {
+    await assert.rejects(validatePublicUrl(`http://[${address}]/menu`));
+    await assert.rejects(validatePublicUrl('https://restaurant.example/menu', async () => [{ address }]));
+  }
   assert.equal(await validatePublicUrl('http://192.0.78.9/menu'), 'http://192.0.78.9/menu');
+  assert.equal(await validatePublicUrl('http://[2001:4860:4860::8888]/menu'), 'http://[2001:4860:4860::8888]/menu');
 });
 
 test('priced lines produce source-matched dish evidence; empty text does not', () => {
