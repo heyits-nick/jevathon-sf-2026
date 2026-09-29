@@ -63,11 +63,15 @@ class TripMessage(SQLModel, table=True):
 
 
 class DecisionTrace(SQLModel, table=True):
-    """One row per real Jev call scoped to a trip. Per docs/architecture.md:
+    """One row per real Jev decision scoped to a trip. Per docs/architecture.md:
     "Persist an actual trace for each decision ... Do not invent decisions
     for steps that did not call Jev" — this table exists so that rule is
     actually enforced, not just documented. Nothing writes here except a
     real, completed Jev response.
+
+    One batched Jev call that answers several questions writes one row per
+    answer. `duration_ms` is that call's wall time on the first of its rows
+    and 0 on the rest, so summing the rows gives the real Jev time.
     """
 
     id: str = Field(default_factory=_new_id, primary_key=True)
@@ -76,7 +80,7 @@ class DecisionTrace(SQLModel, table=True):
     model: str
     choice: Optional[str] = None
     confidence: Optional[float] = None
-    evidence_ids: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    evidence_ids: list[str] = Field(default_factory=list, sa_column=Column(JSON(none_as_null=True), nullable=False))
     duration_ms: int
     created_at: datetime = Field(default_factory=_now)
 

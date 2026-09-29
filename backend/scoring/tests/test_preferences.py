@@ -10,9 +10,13 @@ import uuid
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
+from sqlmodel import Session, text
 
 from backend_scoring import jev_client
 from backend_scoring.jev_client import ChoiceAnswer, JevError
+from backend_scoring.models import DecisionTrace
+from backend_scoring.storage import get_engine
 
 
 def _create_trip(client: TestClient) -> tuple[str, str]:
@@ -26,6 +30,7 @@ def _auth(token: str) -> dict:
 
 
 def test_confirmed_preference_updates_the_trip(client: TestClient, monkeypatch):
+    monkeypatch.setenv("JEV_MODEL", "jev-test-model")
     async def fake_confirm(message_text, candidates):
         return {field: ChoiceAnswer(choice="yes", confidence=0.95, duration_ms=50) for field in candidates}
 
@@ -52,9 +57,11 @@ def test_confirmed_preference_updates_the_trip(client: TestClient, monkeypatch):
     for d in decisions:
         assert d["choice"] == "yes"
         assert d["confidence"] == 0.95
-        assert d["duration_ms"] == 50
-        assert d["model"]  # some real model identifier, not empty
+        assert d["model"] == "jev-test-model"  # the model the request was sent to
         assert d["id"] and d["created_at"]
+    # One batched call answered both fields: its 50 ms is counted once, so
+    # summing the trace (as the web console does) gives the real Jev time.
+    assert sorted(d["duration_ms"] for d in decisions) == [0, 50]
 
 
 def test_decision_trace_is_recorded_even_when_clarification_is_needed(client: TestClient, monkeypatch):
@@ -133,6 +140,28 @@ def test_no_decision_recorded_when_jev_is_never_called(client: TestClient, monke
         json={"client_message_id": str(uuid.uuid4()), "text": "what time do you open"},
     )
     assert resp.json()["trip"]["decisions"] == []
+
+
+def test_trace_without_evidence_ids_is_rejected_on_write(client: TestClient):
+    trip_id, _ = _create_trip(client)
+    with Session(get_engine()) as session:
+        session.add(DecisionTrace(trip_id=trip_id, stage="test", model="m", evidence_ids=None, duration_ms=1))
+        with pytest.raises(IntegrityError):
+            session.commit()
+
+
+def test_trace_fields_jev_did_not_answer_are_absent(client: TestClient):
+    trip_id, token = _create_trip(client)
+    with Session(get_engine()) as session:
+        session.add(DecisionTrace(trip_id=trip_id, stage="test", model="m", duration_ms=1))
+        session.commit()
+        # A row written before evidence_ids was NOT NULL may hold JSON null.
+        session.exec(text("UPDATE decisiontrace SET evidence_ids = 'null'"))
+        session.commit()
+
+    decision = client.get(f"/trips/{trip_id}", headers=_auth(token)).json()["decisions"][0]
+    assert "choice" not in decision and "confidence" not in decision  # absent, not null
+    assert decision["evidence_ids"] == []
 
 
 def test_low_confidence_yes_does_not_apply_and_asks_for_clarification(client: TestClient, monkeypatch):
