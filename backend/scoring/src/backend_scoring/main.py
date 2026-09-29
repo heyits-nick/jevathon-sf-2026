@@ -392,7 +392,12 @@ async def _handle_shared_link(trip: Trip, text: str, source_url: str, client_mes
         try:
             preference_reply = await _apply_preference_text(trip, text, session)
         except JevError:
-            trip.status = "failed"
+            # Newest link wins: a link shared while this one waited owns the trip's status.
+            newer_save = session.exec(
+                select(SavedPost).where(SavedPost.trip_id == trip.id, SavedPost.created_at > save.created_at)
+            ).first()
+            if newer_save is None:
+                trip.status = "failed"
             return "I saved the link, but Jev (our decision service) was unavailable, so I couldn't research it. Share it again to retry."
     reply = await research.research_shared_link(session, trip, save)
     return f"{preference_reply} {reply}" if preference_reply else reply

@@ -462,6 +462,44 @@ def test_a_newer_link_wins_over_older_research_still_running(
         assert [r.status for r in runs] == ["failed" if outcome == "fails" else "superseded", "ready"]
 
 
+def test_an_older_links_preference_outage_leaves_a_newer_links_status(
+    client: TestClient, world: FakeWorld, monkeypatch
+):
+    """The older link's text waits on Jev while a newer link finishes; the
+    older Jev outage must not mark the trip failed."""
+    from backend_scoring.main import app
+
+    trip_id, token = _create_trip(client, diet="vegetarian")
+    reached, release = asyncio.Event(), asyncio.Event()
+
+    async def fail_after_newer(text, candidates):
+        reached.set()
+        await release.wait()
+        raise JevError("Sample outage after the newer link finished.")
+
+    monkeypatch.setattr(jev_client, "confirm_preference_candidates", fail_after_newer)
+
+    async def older_then_newer():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as http:
+
+            def share_link(**extra):
+                body = {"client_message_id": str(uuid.uuid4()), "source_url": POST_URL, **extra}
+                return http.post(f"/trips/{trip_id}/messages", headers=_auth(token), json=body)
+
+            older = asyncio.create_task(share_link(text="I'm vegetarian and want something cheap"))
+            await reached.wait()
+            newer = await share_link()
+            release.set()
+            return await older, newer
+
+    older, newer = asyncio.run(older_then_newer())
+    assert older.status_code == 200 and "unavailable" in older.json()["reply"]
+    assert newer.json()["trip"]["status"] == "ready"
+    trip = client.get(f"/trips/{trip_id}", headers=_auth(token)).json()
+    assert trip["status"] == "ready"
+    assert trip["recommended_candidate_ids"] == newer.json()["trip"]["recommended_candidate_ids"]
+
+
 def test_recall_answers_from_saved_research(client: TestClient, world: FakeWorld):
     trip_id, token, _ = _researched_trip(client)
     searches = world.calls["search_sources"]
