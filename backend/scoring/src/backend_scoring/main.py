@@ -16,15 +16,17 @@ from typing import Optional
 from fastapi import Depends, FastAPI, Header, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy import literal_column
 from sqlmodel import Session, select
 
 from . import auth, jev_client, menu_fetch_client, preference_extraction
 from .jev_client import JevError
 from .menu_fetch_client import MenuFetchError
-from .models import SavedPost, Trip, TripMessage
+from .models import DecisionTrace, SavedPost, Trip, TripMessage
 from .schemas import (
     CreateTripRequest,
     CreateTripResponse,
+    DecisionTraceOut,
     EvidenceOut,
     MessageOut,
     Preferences,
@@ -111,6 +113,11 @@ def _serialize_trip(trip: Trip, session: Session) -> TripOut:
     messages = session.exec(
         select(TripMessage).where(TripMessage.trip_id == trip.id).order_by(TripMessage.created_at)
     ).all()
+    decisions = session.exec(
+        select(DecisionTrace)
+        .where(DecisionTrace.trip_id == trip.id)
+        .order_by(DecisionTrace.created_at, literal_column("decisiontrace.rowid"))
+    ).all()
     return TripOut(
         id=trip.id,
         destination=trip.destination,
@@ -122,7 +129,7 @@ def _serialize_trip(trip: Trip, session: Session) -> TripOut:
         selected_candidate_id=trip.selected_candidate_id,
         clarification=trip.clarification,
         messages=[MessageOut(id=m.id, role=m.role, text=m.text, created_at=m.created_at) for m in messages],
-        decisions=[],
+        decisions=[DecisionTraceOut(**d.model_dump()) for d in decisions],
     )
 
 
@@ -142,8 +149,20 @@ async def _handle_preference_message(trip: Trip, text: str, session: Session) ->
 
     accepted: list[str] = []
     unclear: list[str] = []
-    for field, value in candidates.items():
+    for i, (field, value) in enumerate(candidates.items()):
         answer = confirmations[field]
+        session.add(
+            DecisionTrace(
+                trip_id=trip.id,
+                stage=f"preference:{field}",
+                model=jev_client.current_model(),
+                choice=answer.choice,
+                confidence=answer.confidence,
+                evidence_ids=[],
+                # One batched call answered every field; count its time once.
+                duration_ms=answer.duration_ms if i == 0 else 0,
+            )
+        )
         if answer.choice == "yes" and answer.confidence >= PREFERENCE_MIN_CONFIDENCE:
             setattr(trip, field, value)
             accepted.append(f"{field}={value}")

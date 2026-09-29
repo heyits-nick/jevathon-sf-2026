@@ -7,7 +7,7 @@ web/, photon/, and voice/ per AGENTS.md rule 7.
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ScoreRequest(BaseModel):
@@ -87,11 +87,17 @@ class DecisionTraceOut(BaseModel):
     id: str
     stage: str
     model: str
-    choice: Optional[str] = None
-    confidence: Optional[float] = None
+    # The contract types these as optional: absent when unavailable, not null.
+    choice: Optional[str] = Field(default=None, exclude_if=lambda v: v is None)
+    confidence: Optional[float] = Field(default=None, exclude_if=lambda v: v is None)
     evidence_ids: list[str] = Field(default_factory=list)
     duration_ms: int
     created_at: datetime
+
+    @field_validator("evidence_ids", mode="before")
+    @classmethod
+    def _null_evidence_is_empty(cls, value):
+        return [] if value is None else value
 
 
 class TripOut(BaseModel):
