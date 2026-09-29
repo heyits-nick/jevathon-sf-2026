@@ -16,6 +16,7 @@ from typing import Optional
 from fastapi import Depends, FastAPI, Header, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy import literal_column
 from sqlmodel import Session, select
 
 from . import auth, jev_client, menu_fetch_client, preference_extraction
@@ -113,7 +114,9 @@ def _serialize_trip(trip: Trip, session: Session) -> TripOut:
         select(TripMessage).where(TripMessage.trip_id == trip.id).order_by(TripMessage.created_at)
     ).all()
     decisions = session.exec(
-        select(DecisionTrace).where(DecisionTrace.trip_id == trip.id).order_by(DecisionTrace.created_at)
+        select(DecisionTrace)
+        .where(DecisionTrace.trip_id == trip.id)
+        .order_by(DecisionTrace.created_at, literal_column("decisiontrace.rowid"))
     ).all()
     return TripOut(
         id=trip.id,
@@ -146,7 +149,7 @@ async def _handle_preference_message(trip: Trip, text: str, session: Session) ->
 
     accepted: list[str] = []
     unclear: list[str] = []
-    for field, value in candidates.items():
+    for i, (field, value) in enumerate(candidates.items()):
         answer = confirmations[field]
         session.add(
             DecisionTrace(
@@ -156,7 +159,8 @@ async def _handle_preference_message(trip: Trip, text: str, session: Session) ->
                 choice=answer.choice,
                 confidence=answer.confidence,
                 evidence_ids=[],
-                duration_ms=answer.duration_ms,
+                # One batched call answered every field; count its time once.
+                duration_ms=answer.duration_ms if i == 0 else 0,
             )
         )
         if answer.choice == "yes" and answer.confidence >= PREFERENCE_MIN_CONFIDENCE:
