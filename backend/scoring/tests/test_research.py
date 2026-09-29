@@ -236,6 +236,23 @@ def test_shared_link_is_researched_to_ready_and_persisted(client: TestClient, wo
     assert [m["role"] for m in reread["messages"]] == ["user", "assistant"]
 
 
+def test_batched_jev_calls_count_their_time_once(client: TestClient, world: FakeWorld, monkeypatch):
+    async def select_sources_with_names(place, diet, results, timeout):
+        # As if each menu title had several segments, so Jev also picks a name.
+        selections = await world.select_sources(place, diet, results, timeout)
+        return {i: (is_menu, _answer("s0") if is_menu.choice == "yes" else None) for i, (is_menu, _) in selections.items()}
+
+    monkeypatch.setattr(jev_client, "select_sources", select_sources_with_names)
+    _, _, body = _researched_trip(client)
+    decisions = body["trip"]["decisions"]
+    # Each batched call (place resolution, source selection) answered several
+    # questions in one 40 ms fake call; summing its rows must give 40, not 40×N.
+    for stages in ({"place:single_location", "place:candidate"}, {"source_selection", "restaurant_name"}):
+        durations = [d["duration_ms"] for d in decisions if d["stage"] in stages]
+        assert len(durations) > 1 and any(d["stage"] == "restaurant_name" for d in decisions)
+        assert sorted(durations) == [0] * (len(durations) - 1) + [40]
+
+
 def test_duplicate_message_makes_no_provider_calls(client: TestClient, world: FakeWorld):
     trip_id, token = _create_trip(client, diet="vegetarian")
     message_id = str(uuid.uuid4())

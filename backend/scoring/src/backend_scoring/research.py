@@ -74,8 +74,11 @@ def trace(
     answer: ChoiceAnswer,
     choice: str | None = None,
     evidence_ids: list[str] | None = None,
+    counts_time: bool = True,
 ) -> None:
-    """Persist one real Jev decision (docs/architecture.md: never invent traces)."""
+    """Persist one real Jev decision (docs/architecture.md: never invent traces).
+    Pass counts_time=False for the second and later answers of one batched
+    call, so the call's time is summed once (see DecisionTrace)."""
     session.add(
         DecisionTrace(
             trip_id=trip_id,
@@ -84,7 +87,7 @@ def trace(
             choice=choice if choice is not None else answer.choice,
             confidence=answer.confidence,
             evidence_ids=(evidence_ids or [])[:20],
-            duration_ms=answer.duration_ms,
+            duration_ms=answer.duration_ms if counts_time else 0,
         )
     )
 
@@ -220,7 +223,7 @@ async def _identify_place(
     confirmed = []
     for i, proposal in enumerate(proposals):
         answer = per_candidate[i]
-        trace(session, trip.id, "place:candidate", answer, choice=f"{proposal} → {answer.choice}")
+        trace(session, trip.id, "place:candidate", answer, choice=f"{proposal} → {answer.choice}", counts_time=False)
         if answer.choice == "yes" and answer.confidence >= 0.5:
             confirmed.append(proposal)
 
@@ -297,13 +300,16 @@ async def _research_place(session: Session, trip: Trip, run: ResearchRun, budget
     ranked: list[tuple[float, dict, str]] = []
     for i, result in enumerate(results):
         is_menu, name_answer = selections[i]
-        trace(session, trip.id, "source_selection", is_menu, choice=f"{result['title'][:80]} → {is_menu.choice}")
+        trace(
+            session, trip.id, "source_selection", is_menu,
+            choice=f"{result['title'][:80]} → {is_menu.choice}", counts_time=i == 0,
+        )
         if is_menu.choice != "yes":  # Jev's call; the fetch step still requires real dishes
             continue
         segments = result["title_segments"] or [result["title"]]
         name = segments[0] if len(segments) == 1 else result["title"]
         if name_answer is not None:
-            trace(session, trip.id, "restaurant_name", name_answer)
+            trace(session, trip.id, "restaurant_name", name_answer, counts_time=False)
             if name_answer.choice.startswith("s"):
                 name = segments[int(name_answer.choice[1:])]
         ranked.append((is_menu.confidence, result, name))
