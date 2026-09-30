@@ -54,6 +54,8 @@ DishVerdict = ChoiceAnswer
 
 # How far Jev's own choice must lead the next option to count as a decision.
 MIN_PROBABILITY_MARGIN = 0.1
+# Float subtraction (0.5 - 0.4 == 0.09999999999999998) must not reject an exact 0.1 lead.
+_MARGIN_TOLERANCE = 1e-9
 
 
 def supported(answer: ChoiceAnswer, minimum: float) -> bool:
@@ -70,7 +72,7 @@ def supported(answer: ChoiceAnswer, minimum: float) -> bool:
         return answer.confidence >= minimum
     chosen = probabilities[answer.choice]
     runner_up = max((p for k, p in probabilities.items() if k != answer.choice), default=0.0)
-    return chosen >= minimum and chosen - runner_up >= MIN_PROBABILITY_MARGIN
+    return chosen >= minimum and chosen - runner_up >= MIN_PROBABILITY_MARGIN - _MARGIN_TOLERANCE
 
 
 def support(answer: ChoiceAnswer) -> float:

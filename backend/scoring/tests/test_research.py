@@ -744,3 +744,15 @@ def test_recall_and_set_aside_act_on_jevs_live_answer_shape(client: TestClient, 
     assert _send(client, trip_id, token, text="What did you find?").json()["reply"].startswith("From the menus I checked")
     reply = _send(client, trip_id, token, text="I don't like that one, show me another").json()["reply"]
     assert reply.startswith("Okay, setting aside Green Leaf Cafe.")
+
+
+@pytest.mark.parametrize(
+    ("probabilities", "minimum", "expected"),
+    [
+        ({"c1": 0.5, "c2": 0.4, "none": 0.1}, 0.5, True),  # exact 0.1 lead; 0.5 - 0.4 is 0.0999... in floats
+        ({"c1": 0.6, "none": 0.5}, 0.6, True),  # same boundary at the 0.6 threshold
+        ({"c1": 0.5, "c2": 0.41, "none": 0.09}, 0.5, False),  # a lead just under 0.1 still fails
+    ],
+)
+def test_supported_accepts_a_lead_of_exactly_the_margin(probabilities, minimum, expected):
+    assert jev_client.supported(_answer("c1", 0.1, probabilities), minimum) is expected
