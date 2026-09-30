@@ -21,7 +21,7 @@ from sqlmodel import Session, select
 
 from backend_scoring import jev_client, menu_fetch_client
 from backend_scoring.jev_client import ChoiceAnswer, JevError
-from backend_scoring.models import ResearchRun, Trip, TripMessage
+from backend_scoring.models import ResearchCandidate, ResearchRun, Trip, TripMessage
 from backend_scoring.storage import get_engine
 
 POST_URL = "https://www.instagram.com/reel/SAMPLE123/"
@@ -648,3 +648,30 @@ def test_a_slow_preference_check_is_cut_off_inside_the_request_budget(client: Te
     assert resp.status_code == 200
     assert "Jev (our decision service) was unavailable" in resp.json()["reply"]
     assert world.calls["resolve_place"] == 0
+
+
+def test_an_alternative_yields_to_a_newer_links_recommendation(client: TestClient, world: FakeWorld, monkeypatch):
+    """While Jev chooses the alternative, a newer link's research commits its
+    own recommendation; the older research must not add a second one."""
+    trip_id, token, body = _researched_trip(client)
+    save_id = body["trip"]["saves"][0]["id"]
+    original = jev_client.choose_recommendation
+    newer_id = str(uuid.uuid4())
+
+    async def newer_link_finishes_first(*args, **kwargs):
+        with Session(get_engine()) as session:
+            newer = ResearchRun(trip_id=trip_id, save_id=save_id, status="ready", place="Sample newer place")
+            session.add(newer)
+            session.add(
+                ResearchCandidate(id=newer_id, trip_id=trip_id, run_id=newer.id, restaurant="Newer Sample", menu_url="", rank=0)
+            )
+            session.commit()
+        return await original(*args, **kwargs)
+
+    monkeypatch.setattr(jev_client, "choose_recommendation", newer_link_finishes_first)
+    resp = _send(client, trip_id, token, text="I don't like Green Leaf, show me another")
+    assert resp.status_code == 200
+    assert "newer link" in resp.json()["reply"]
+    trip = resp.json()["trip"]
+    assert trip["recommended_candidate_ids"] == [newer_id]
+    assert _by_name(trip)["Green Leaf Cafe"]["recommendation_reason"].startswith("You set this one aside")

@@ -566,6 +566,18 @@ def _newer_run_exists(session: Session, run: ResearchRun) -> bool:
     return newest is not None and newest.id != run.id
 
 
+def other_run_recommends(session: Session, run: ResearchRun) -> bool:
+    """Another run (a newer link) already holds the trip's recommendation."""
+    return session.exec(
+        select(ResearchCandidate).where(
+            ResearchCandidate.trip_id == run.trip_id,
+            ResearchCandidate.run_id != run.id,
+            ResearchCandidate.rank == 0,
+            ResearchCandidate.rejected == False,  # noqa: E712 (SQL expression)
+        )
+    ).first() is not None
+
+
 def _set_aside(session: Session, run: ResearchRun, detail: str = "") -> str:
     run.status = "superseded"
     run.finished_at = _now()

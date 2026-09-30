@@ -15,6 +15,7 @@ from .research import (
     eligible,
     fact_line,
     option_keys,
+    other_run_recommends,
     rank_key,
     recommend,
     summary,
@@ -111,6 +112,16 @@ async def alternative(session: Session, trip: Trip, text: str, run: ResearchRun,
         session, trip, run.place or "the saved place", remaining, JEV_STEP_TIMEOUT,
         stage="alternative", lead="From the same research, Jev suggests", scored_diet=run.diet,
     )
+    if other_run_recommends(session, run):
+        # A newer link's research finished while Jev chose; it owns the
+        # recommendation. The rejection above is still the traveler's choice.
+        for candidate in remaining:
+            candidate.rank = None
+            candidate.recommendation_reason = None
+        return (
+            f"{lead} You shared a newer link while I was choosing, and its research now has the recommendation."
+            f"{_diet_note(trip, run)}"
+        )
     top = next((c for c in remaining if c.rank == 0), None)
     if top is not None:
         reply += f"Source: {top.menu_url}."
