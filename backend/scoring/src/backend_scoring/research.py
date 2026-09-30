@@ -363,8 +363,10 @@ async def _research_place(session: Session, trip: Trip, run: ResearchRun, budget
             session, trip.id, "source_selection", is_menu,
             choice=f"{result['title'][:80]} → {is_menu.choice}", counts_time=i == 0,
         )
-        # Jev's call, and only a confident one; the fetch step still requires real dishes.
-        if is_menu.choice != "yes" or is_menu.confidence < MIN_JEV_CONFIDENCE:
+        # Jev's call. A low-confidence "yes" is only a lower-priority fetch attempt
+        # (ranked below), never a candidate: a page counts only if it yields priced
+        # dishes, and every dish is still judged by Jev.
+        if is_menu.choice != "yes":
             continue
         segments = result["title_segments"] or [result["title"]]
         name = segments[0] if len(segments) == 1 else result["title"]

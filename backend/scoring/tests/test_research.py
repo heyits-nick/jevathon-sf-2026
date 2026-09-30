@@ -616,23 +616,24 @@ def test_a_preference_update_keeps_a_waiting_place_question(client: TestClient, 
     assert world.calls["resolve_place"] == 1  # "I'm vegan" names no place, so no place decision was asked
 
 
-def test_low_confidence_source_and_name_answers_are_not_used(client: TestClient, world: FakeWorld, monkeypatch):
-    async def unsure_sources(place, diet, results, timeout):
+def test_a_low_confidence_name_answer_is_not_used(client: TestClient, world: FakeWorld, monkeypatch):
+    async def unsure_name(place, diet, results, timeout):
         world.calls["select_sources"] += 1
         answers = {}
         for i, r in enumerate(results):
-            if r["url"] == "https://stonegrill.example/menu":
-                answers[i] = (_answer("yes", 0.4), None)  # unsure it's a menu
-            elif r["url"] == "https://greenleaf.example/menu":
+            if r["url"] == "https://greenleaf.example/menu":
                 answers[i] = (_answer("yes"), _answer("s1", 0.3))  # unsure which segment is the name
+            elif r["url"] == "https://stonegrill.example/menu":
+                # A weak "yes" is still worth fetching; the menu's own dishes decide.
+                answers[i] = (_answer("yes", 0.22), None)
             else:
                 answers[i] = (_answer("no"), None)
         return answers
 
-    monkeypatch.setattr(jev_client, "select_sources", unsure_sources)
+    monkeypatch.setattr(jev_client, "select_sources", unsure_name)
     monkeypatch.setitem(SAMPLE_RESULTS[0], "title", "Green Leaf Cafe | Downtown Eats")
     names = set(_by_name(_researched_trip(client)[2]["trip"]))
-    assert names == {"Green Leaf Cafe | Downtown Eats"}
+    assert names == {"Green Leaf Cafe | Downtown Eats", "Stone Grill"}
 
 
 def test_a_slow_preference_check_is_cut_off_inside_the_request_budget(client: TestClient, world: FakeWorld, monkeypatch):
@@ -695,3 +696,17 @@ def test_a_place_answer_that_a_newer_link_replaced_does_not_repeat_the_old_quest
     monkeypatch.setattr(jev_client, "resolve_place", newer_link_arrives_first)
     reply = _send(client, trip_id, token, text="It's the one at 18 Church Street").json()["reply"]
     assert "newer link" in reply and "Which place" not in reply
+
+
+@pytest.mark.parametrize(("count", "offers_all"), [(1, False), (2, True)])
+def test_recall_offers_all_only_when_there_are_several_restaurants(monkeypatch, count: int, offers_all: bool):
+    asked = {}
+
+    async def capture(state, questions, timeout):
+        asked.update(questions["recall"]["criteria"])
+        return {"recall": _answer("c1")}
+
+    monkeypatch.setattr(jev_client, "ask_choice_questions", capture)
+    summaries = {f"c{i + 1}": f"Sample restaurant {i + 1}" for i in range(count)}
+    asyncio.run(jev_client.choose_recall("What did you find?", summaries, 5))
+    assert ("all" in asked) is offers_all and "none" in asked

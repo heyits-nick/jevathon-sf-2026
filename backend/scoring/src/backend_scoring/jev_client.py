@@ -293,7 +293,8 @@ async def classify_intent(message_text: str, context: str, timeout: float) -> Ch
 
 async def choose_recall(message_text: str, summaries: dict[str, str], timeout: float) -> ChoiceAnswer:
     criteria = dict(summaries)
-    criteria["all"] = "The question is about all of the researched restaurants together."
+    if len(summaries) > 1:  # with one restaurant, "all" would duplicate it and split Jev's answer
+        criteria["all"] = "The question is about all of the researched restaurants together."
     criteria["none"] = (
         "The saved research cannot answer this (e.g. it asks about hours, distance, prices, a different diet, "
         "or something not covered by these menu checks)."
