@@ -152,9 +152,10 @@ def option_keys(candidates: list[ResearchCandidate]) -> dict[str, ResearchCandid
 # --- Phase 1: shared link -> place ------------------------------------------
 
 
-async def research_shared_link(session: Session, trip: Trip, save: SavedPost) -> str:
+async def research_shared_link(session: Session, trip: Trip, save: SavedPost, budget: Budget | None = None) -> str:
     """Runs with the user's message and the SavedPost already committed.
-    Returns the reply; persists trip status, traces, and candidates."""
+    Returns the reply; persists trip status, traces, and candidates. Pass the
+    request's `budget` when earlier steps of the same request already spent some."""
     # The newer link replaces any earlier run still waiting on the traveler.
     for stale in session.exec(
         select(ResearchRun).where(ResearchRun.trip_id == trip.id, ResearchRun.status.in_(("needs_place", "needs_diet")))
@@ -168,21 +169,12 @@ async def research_shared_link(session: Session, trip: Trip, save: SavedPost) ->
     session.add(trip)
     session.commit()
 
-    budget = Budget(budget_seconds())
+    budget = budget or Budget(budget_seconds())
     try:
         place, clarification = await _identify_place(session, trip, save, run, budget)
         if clarification:
             return _needs_clarification(session, trip, run, "needs_place", clarification)
-        if not trip.diet:
-            return _needs_clarification(
-                session,
-                trip,
-                run,
-                "needs_diet",
-                f"I identified {place} from the post's caption. What dietary preference should I "
-                "check nearby menus for (for example vegetarian or vegan)?",
-            )
-        return await research_place(session, trip, run, budget)
+        return await _continue_with_place(session, trip, run, budget)
     except JevError:
         return _failed(
             session, trip, run,
@@ -218,7 +210,19 @@ async def _identify_place(
     if not proposals:
         return None, f"I read the caption, but it doesn't name a place I can look up. {ask}"
 
-    single, per_candidate = await jev_client.resolve_place(caption, proposals, timeout=budget.step(15, reserve=15))
+    place = await _confirm_place(session, trip, save, run, caption, proposals, budget)
+    if place is None:
+        mentioned = ", ".join(proposals)
+        return None, f"The caption mentions {mentioned}, and I can't tell which single place it's about. {ask}"
+    return place, None
+
+
+async def _confirm_place(
+    session: Session, trip: Trip, save: SavedPost, run: ResearchRun, text: str, proposals: list[str], budget: Budget
+) -> str | None:
+    """Jev decides which proposed place strings (if any) the text is about.
+    Persists and returns the place, or None when Jev isn't confident."""
+    single, per_candidate = await jev_client.resolve_place(text, proposals, timeout=budget.step(15, reserve=15))
     trace(session, trip.id, "place:single_location", single)
     confirmed = []
     for i, proposal in enumerate(proposals):
@@ -226,10 +230,8 @@ async def _identify_place(
         trace(session, trip.id, "place:candidate", answer, choice=f"{proposal} → {answer.choice}", counts_time=False)
         if answer.choice == "yes" and answer.confidence >= 0.5:
             confirmed.append(proposal)
-
     if single.choice != "yes" or single.confidence < MIN_JEV_CONFIDENCE or not confirmed:
-        mentioned = ", ".join(proposals)
-        return None, f"The caption mentions {mentioned}, and I can't tell which single place it's about. {ask}"
+        return None
 
     place = ", ".join(confirmed)
     run.place = place
@@ -237,7 +239,58 @@ async def _identify_place(
     session.add(run)
     session.add(save)
     session.commit()
-    return place, None
+    return place
+
+
+async def _continue_with_place(session: Session, trip: Trip, run: ResearchRun, budget: Budget) -> str:
+    if not trip.diet:
+        return _needs_clarification(session, trip, run, "needs_diet", pending_question(run, "needs_diet"))
+    return await research_place(session, trip, run, budget)
+
+
+# --- Answers to a waiting run's question ------------------------------------
+
+
+def waiting_run(session: Session, trip_id: str) -> ResearchRun | None:
+    """The trip's newest run, when it is waiting on the traveler for a place or diet."""
+    newest = session.exec(
+        select(ResearchRun).where(ResearchRun.trip_id == trip_id).order_by(ResearchRun.created_at.desc())
+    ).first()
+    return newest if newest is not None and newest.status in ("needs_place", "needs_diet") else None
+
+
+def pending_question(run: ResearchRun, status: str | None = None) -> str:
+    if (status or run.status) == "needs_place":
+        return "Which place should I research for the post you shared?"
+    return (
+        f"I identified {run.place} from the post's caption. What dietary preference should I "
+        "check nearby menus for (for example vegetarian or vegan)?"
+    )
+
+
+async def answer_place(session: Session, trip: Trip, run: ResearchRun, text: str, budget: Budget) -> str | None:
+    """A text message while `run` waits for a place. Code proposes place strings
+    from the message (and caption places it mentions); Jev decides. Returns None
+    when the message proposes no place, so the caller handles it as usual.
+    Raises JevError when Jev is unavailable; the run keeps waiting."""
+    caption = run.caption_excerpt or ""
+    proposals = caption_mod.place_candidates(text)
+    lowered = text.lower()
+    for mentioned in caption_mod.place_candidates(caption):
+        if mentioned.lower() in lowered and mentioned.lower() not in {p.lower() for p in proposals}:
+            proposals.append(mentioned)
+    if not proposals:
+        return None
+
+    save = session.get(SavedPost, run.save_id)
+    context = f"{caption}\nAsked which place the post is about, the traveler answered: {text}".strip()
+    try:
+        place = await _confirm_place(session, trip, save, run, context, proposals, budget)
+    except BudgetExhausted:
+        return f"I ran out of time checking that place. {pending_question(run)}"
+    if place is None:
+        return f"I still can't tell which single place you mean ({', '.join(proposals)}). {pending_question(run)}"
+    return f"Got it: {place}. " + await _continue_with_place(session, trip, run, budget)
 
 
 # --- Phase 2: place -> researched candidates -> recommendation ---------------
@@ -304,13 +357,15 @@ async def _research_place(session: Session, trip: Trip, run: ResearchRun, budget
             session, trip.id, "source_selection", is_menu,
             choice=f"{result['title'][:80]} → {is_menu.choice}", counts_time=i == 0,
         )
-        if is_menu.choice != "yes":  # Jev's call; the fetch step still requires real dishes
+        # Jev's call, and only a confident one; the fetch step still requires real dishes.
+        if is_menu.choice != "yes" or is_menu.confidence < MIN_JEV_CONFIDENCE:
             continue
         segments = result["title_segments"] or [result["title"]]
         name = segments[0] if len(segments) == 1 else result["title"]
         if name_answer is not None:
             trace(session, trip.id, "restaurant_name", name_answer, counts_time=False)
-            if name_answer.choice.startswith("s"):
+            # Without a confident pick the full title is shown as-is, never a guessed segment.
+            if name_answer.choice.startswith("s") and name_answer.confidence >= MIN_JEV_CONFIDENCE:
                 name = segments[int(name_answer.choice[1:])]
         ranked.append((is_menu.confidence, result, name))
     ranked.sort(key=lambda item: -item[0])
@@ -409,7 +464,7 @@ async def _research_place(session: Session, trip: Trip, run: ResearchRun, budget
 
     reply = f"From the post's caption I identified {place}. I checked {len(candidates)} nearby menu(s) for {diet} options. "
     try:
-        reply += await recommend(session, trip, place, candidates, budget.step(12))
+        reply += await recommend(session, trip, place, candidates, budget.step(12), scored_diet=diet)
     except (JevError, BudgetExhausted):
         warnings.append("Jev could not complete the recommendation step; the checked menus are saved without a pick.")
         reply += "Jev couldn't finish choosing a recommendation, so the checked menus are saved without a pick. "
@@ -439,16 +494,19 @@ async def recommend(
     timeout: float,
     stage: str = "recommendation",
     lead: str = "Jev recommends",
+    scored_diet: str | None = None,
 ) -> str:
-    """Ranks `candidates` in place via Jev and returns reply text."""
-    diet = trip.diet or "your"
+    """Ranks `candidates` in place via Jev and returns reply text.
+    `scored_diet` is the diet the candidates' dishes were judged for."""
+    scored_diet = scored_diet or trip.diet
+    diet = scored_diet or "your"
     pool = [c for c in candidates if eligible(c)]
     if not pool:
         return f"None of those menus had dishes Jev judged {diet}-compatible with high confidence, so I'm not recommending one."
     options = option_keys(pool)
     answer = await jev_client.choose_recommendation(
         place,
-        {"diet": trip.diet, "budget": trip.budget},
+        {"diet": scored_diet, "budget": trip.budget},
         {key: summary(c, diet) for key, c in options.items()},
         timeout=timeout,
     )

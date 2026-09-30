@@ -21,7 +21,7 @@ from sqlmodel import Session, select
 
 from backend_scoring import jev_client, menu_fetch_client
 from backend_scoring.jev_client import ChoiceAnswer, JevError
-from backend_scoring.models import ResearchRun, TripMessage
+from backend_scoring.models import ResearchRun, Trip, TripMessage
 from backend_scoring.storage import get_engine
 
 POST_URL = "https://www.instagram.com/reel/SAMPLE123/"
@@ -572,3 +572,79 @@ def test_messages_require_the_trip_token(client: TestClient, world: FakeWorld):
     assert resp.status_code == 403
     assert resp.json()["error"]["code"] == "FORBIDDEN"
     assert sum(world.calls.values()) == 0
+
+
+def test_recall_labels_saved_verdicts_with_the_diet_they_were_scored_for(client: TestClient, world: FakeWorld):
+    trip_id, token, _ = _researched_trip(client)
+    with Session(get_engine()) as session:
+        trip = session.get(Trip, trip_id)
+        trip.diet = "vegan"  # changed after the vegetarian research, without re-research
+        session.add(trip)
+        session.commit()
+
+    reply = _send(client, trip_id, token, text="What did you find for me?").json()["reply"]
+    assert "vegetarian-compatible" in reply and "vegan-compatible" not in reply
+    assert "checked for vegetarian, not vegan" in reply
+
+    alternative = _send(client, trip_id, token, text="I don't like Green Leaf, show me another").json()["reply"]
+    assert "vegan-compatible" not in alternative and "checked for vegetarian, not vegan" in alternative
+
+
+def test_a_text_naming_the_place_answers_a_waiting_place_question(client: TestClient, world: FakeWorld):
+    trip_id, token = _create_trip(client, diet="vegetarian")
+    world.place_unclear = True
+    asked = _send(client, trip_id, token, source_url=POST_URL).json()
+    assert asked["trip"]["status"] == "needs_clarification"
+
+    world.place_unclear = False
+    resp = _send(client, trip_id, token, text="It's the one at 18 Church Street")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["reply"].startswith("Got it: 18 Church Street.")
+    assert body["trip"]["status"] == "ready" and body["trip"]["recommended_candidate_ids"]
+
+
+def test_a_preference_update_keeps_a_waiting_place_question(client: TestClient, world: FakeWorld):
+    trip_id, token = _create_trip(client)
+    world.place_unclear = True
+    _send(client, trip_id, token, source_url=POST_URL)
+
+    body = _send(client, trip_id, token, text="I'm vegan").json()
+    assert body["trip"]["preferences"]["diet"] == "vegan"
+    assert body["trip"]["status"] == "needs_clarification"
+    assert "Which place should I research" in body["trip"]["clarification"]
+    assert world.calls["resolve_place"] == 1  # "I'm vegan" names no place, so no place decision was asked
+
+
+def test_low_confidence_source_and_name_answers_are_not_used(client: TestClient, world: FakeWorld, monkeypatch):
+    async def unsure_sources(place, diet, results, timeout):
+        world.calls["select_sources"] += 1
+        answers = {}
+        for i, r in enumerate(results):
+            if r["url"] == "https://stonegrill.example/menu":
+                answers[i] = (_answer("yes", 0.4), None)  # unsure it's a menu
+            elif r["url"] == "https://greenleaf.example/menu":
+                answers[i] = (_answer("yes"), _answer("s1", 0.3))  # unsure which segment is the name
+            else:
+                answers[i] = (_answer("no"), None)
+        return answers
+
+    monkeypatch.setattr(jev_client, "select_sources", unsure_sources)
+    monkeypatch.setitem(SAMPLE_RESULTS[0], "title", "Green Leaf Cafe | Downtown Eats")
+    names = set(_by_name(_researched_trip(client)[2]["trip"]))
+    assert names == {"Green Leaf Cafe | Downtown Eats"}
+
+
+def test_a_slow_preference_check_is_cut_off_inside_the_request_budget(client: TestClient, world: FakeWorld, monkeypatch):
+    from backend_scoring import main
+
+    async def slow_confirm(text, candidates):
+        await asyncio.sleep(5)
+
+    monkeypatch.setattr(main, "PREFERENCE_JEV_TIMEOUT_SECONDS", 1.0)
+    monkeypatch.setattr(jev_client, "confirm_preference_candidates", slow_confirm)
+    trip_id, token = _create_trip(client)
+    resp = _send(client, trip_id, token, source_url=POST_URL, text="I'm vegan")
+    assert resp.status_code == 200
+    assert "Jev (our decision service) was unavailable" in resp.json()["reply"]
+    assert world.calls["resolve_place"] == 0

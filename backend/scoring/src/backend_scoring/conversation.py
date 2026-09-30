@@ -24,19 +24,30 @@ from .research import (
 JEV_STEP_TIMEOUT = 15.0
 
 
+def _scored_diet(trip: Trip, run: ResearchRun) -> str:
+    """The diet the saved menus were judged for; a later diet change doesn't relabel them."""
+    return run.diet or trip.diet or "menu"
+
+
+def _diet_note(trip: Trip, run: ResearchRun) -> str:
+    if run.diet and trip.diet and run.diet != trip.diet:
+        return f" These menus were checked for {run.diet}, not {trip.diet}; share the link again to check them for {trip.diet}."
+    return ""
+
+
 def _context(run: ResearchRun, candidates: list[ResearchCandidate], diet: str) -> str:
     names = ", ".join(c.restaurant for c in candidates)
     return f"The trip has saved {diet} menu research near {run.place or 'a saved place'} covering: {names}."
 
 
 async def classify(session: Session, trip: Trip, text: str, run: ResearchRun, candidates: list[ResearchCandidate]) -> str:
-    answer = await jev_client.classify_intent(text, _context(run, candidates, trip.diet or "menu"), JEV_STEP_TIMEOUT)
+    answer = await jev_client.classify_intent(text, _context(run, candidates, _scored_diet(trip, run)), JEV_STEP_TIMEOUT)
     trace(session, trip.id, "intent", answer)
     return answer.choice if answer.confidence >= 0.5 else "unclear"
 
 
 async def recall(session: Session, trip: Trip, text: str, run: ResearchRun, candidates: list[ResearchCandidate]) -> str:
-    diet = trip.diet or "menu"
+    diet = _scored_diet(trip, run)
     active = [c for c in candidates if not c.rejected] or candidates
     options = option_keys(active)
     answer = await jev_client.choose_recall(
@@ -50,6 +61,7 @@ async def recall(session: Session, trip: Trip, text: str, run: ResearchRun, cand
         return (
             f"My saved research doesn't answer that. It covers {diet} menu checks near {run.place} for {covered}. "
             "Share another post or place and I can research it."
+            + _diet_note(trip, run)
         )
     selected = active if answer.choice == "all" else [chosen]
     recommended = next((c for c in active if c.rank == 0), None)
@@ -57,11 +69,11 @@ async def recall(session: Session, trip: Trip, text: str, run: ResearchRun, cand
     for candidate in selected:
         marker = " (current recommendation)" if candidate is recommended else ""
         lines.append(fact_line(candidate, diet).replace(":", marker + ":", 1))
-    return f"From the menus I checked near {run.place}: " + " ".join(lines)
+    return f"From the menus I checked near {run.place}: " + " ".join(lines) + _diet_note(trip, run)
 
 
 async def alternative(session: Session, trip: Trip, text: str, run: ResearchRun, candidates: list[ResearchCandidate]) -> str:
-    diet = trip.diet or "menu"
+    diet = _scored_diet(trip, run)
     active = [c for c in candidates if not c.rejected]
     if not active:
         return "You've set aside every restaurant from this research. Share another post or place and I can research it."
@@ -93,13 +105,13 @@ async def alternative(session: Session, trip: Trip, text: str, run: ResearchRun,
         suffix = f" The other menus I checked: {others}." if others else ""
         return (
             f"{lead} None of the other researched menus had dishes judged {diet}-compatible with high confidence."
-            f"{suffix} Share another post or place and I can research it."
+            f"{suffix} Share another post or place and I can research it.{_diet_note(trip, run)}"
         )
     reply = await recommend(
         session, trip, run.place or "the saved place", remaining, JEV_STEP_TIMEOUT,
-        stage="alternative", lead="From the same research, Jev suggests",
+        stage="alternative", lead="From the same research, Jev suggests", scored_diet=run.diet,
     )
     top = next((c for c in remaining if c.rank == 0), None)
     if top is not None:
         reply += f"Source: {top.menu_url}."
-    return f"{lead} {reply}".strip()
+    return f"{lead} {reply}{_diet_note(trip, run)}".strip()

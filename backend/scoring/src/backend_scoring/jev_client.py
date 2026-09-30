@@ -12,6 +12,7 @@ repo's Jev usage guidance: no property-of-a-property questions, and literal
 text beats an ID Jev has to cross-reference.
 """
 
+import asyncio
 import os
 import time
 from dataclasses import dataclass
@@ -71,11 +72,17 @@ async def ask_choice_questions(
     start = time.monotonic()
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.post(
-                JEV_ENDPOINT,
-                json=payload,
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            # httpx timeouts apply per phase; wait_for makes `timeout` the call's total.
+            response = await asyncio.wait_for(
+                client.post(
+                    JEV_ENDPOINT,
+                    json=payload,
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                ),
+                timeout,
             )
+    except asyncio.TimeoutError as exc:
+        raise JevError(f"Jev did not answer within {timeout:.0f} s.") from exc
     except httpx.HTTPError as exc:
         raise JevError(f"Could not reach Jev: {exc}") from exc
     duration_ms = int((time.monotonic() - start) * 1000)

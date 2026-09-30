@@ -56,13 +56,14 @@ cd backend/scoring && uv run uvicorn backend_scoring.main:app --host 127.0.0.1 -
 
 Demo sequence: README → "Reproducible demo: shared link → researched
 recommendation" (test input `https://www.instagram.com/reel/DdouiWwP1oe/` on a
-trip with diet `vegetarian`). Tests: `uv run pytest -q` (42 passing;
+trip with diet `vegetarian`). Tests: `uv run pytest -q` (61 passing;
 `tests/test_research.py` uses labeled fake providers).
 
 Known limits: research runs inside the request (4–6 s measured in the
 earlier local session, 45 s cap), so a crash mid-run can leave status
-`researching`; a reply to a place clarification doesn't resume research (only
-a diet reply does); menu yield depends on search results. The gap list
+`researching`; a reply to a place clarification resumes research only when it
+names a place (an address, "at/near <Name>", or a place the caption mentioned)
+and Jev confirms it; menu yield depends on search results. The gap list
 below predates this work: items 1, 2 and 4 are addressed by PR #32 once it
 merges.
 
