@@ -287,6 +287,12 @@ async def answer_place(session: Session, trip: Trip, run: ResearchRun, text: str
     try:
         place = await _confirm_place(session, trip, save, run, context, proposals, budget)
     except BudgetExhausted:
+        place, ran_out = None, True
+    else:
+        ran_out = False
+    if place is None and _newer_run_exists(session, run):
+        return _set_aside(session, run)  # a link shared meanwhile replaced this post's question
+    if ran_out:
         return f"I ran out of time checking that place. {pending_question(run)}"
     if place is None:
         return f"I still can't tell which single place you mean ({', '.join(proposals)}). {pending_question(run)}"

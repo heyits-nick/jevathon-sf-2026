@@ -675,3 +675,23 @@ def test_an_alternative_yields_to_a_newer_links_recommendation(client: TestClien
     trip = resp.json()["trip"]
     assert trip["recommended_candidate_ids"] == [newer_id]
     assert _by_name(trip)["Green Leaf Cafe"]["recommendation_reason"].startswith("You set this one aside")
+
+
+def test_a_place_answer_that_a_newer_link_replaced_does_not_repeat_the_old_question(
+    client: TestClient, world: FakeWorld, monkeypatch
+):
+    trip_id, token = _create_trip(client, diet="vegetarian")
+    world.place_unclear = True
+    body = _send(client, trip_id, token, source_url=POST_URL).json()
+    save_id = body["trip"]["saves"][0]["id"]
+    original = jev_client.resolve_place
+
+    async def newer_link_arrives_first(*args, **kwargs):
+        with Session(get_engine()) as session:
+            session.add(ResearchRun(trip_id=trip_id, save_id=save_id, status="researching"))
+            session.commit()
+        return await original(*args, **kwargs)  # still unclear
+
+    monkeypatch.setattr(jev_client, "resolve_place", newer_link_arrives_first)
+    reply = _send(client, trip_id, token, text="It's the one at 18 Church Street").json()["reply"]
+    assert "newer link" in reply and "Which place" not in reply
