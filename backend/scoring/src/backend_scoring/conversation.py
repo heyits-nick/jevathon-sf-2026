@@ -44,7 +44,7 @@ def _context(run: ResearchRun, candidates: list[ResearchCandidate], diet: str) -
 async def classify(session: Session, trip: Trip, text: str, run: ResearchRun, candidates: list[ResearchCandidate]) -> str:
     answer = await jev_client.classify_intent(text, _context(run, candidates, _scored_diet(trip, run)), JEV_STEP_TIMEOUT)
     trace(session, trip.id, "intent", answer)
-    return answer.choice if answer.confidence >= 0.5 else "unclear"
+    return answer.choice if jev_client.supported(answer, 0.5) else "unclear"
 
 
 async def recall(session: Session, trip: Trip, text: str, run: ResearchRun, candidates: list[ResearchCandidate]) -> str:
@@ -58,7 +58,7 @@ async def recall(session: Session, trip: Trip, text: str, run: ResearchRun, cand
     trace(session, trip.id, "recall", answer, choice=chosen.restaurant if chosen else answer.choice,
           evidence_ids=[e["id"] for e in (chosen.evidence if chosen else [])][:20])
     covered = ", ".join(c.restaurant for c in active)
-    if answer.choice == "none" or answer.confidence < 0.5:
+    if answer.choice == "none" or not jev_client.supported(answer, 0.5):
         return (
             f"My saved research doesn't answer that. It covers {diet} menu checks near {run.place} for {covered}. "
             "Share another post or place and I can research it."
@@ -85,7 +85,7 @@ async def alternative(session: Session, trip: Trip, text: str, run: ResearchRun,
     answer = await jev_client.choose_rejected(text, labels, JEV_STEP_TIMEOUT)
     rejected = options.get(answer.choice)
     trace(session, trip.id, "rejected_candidate", answer, choice=rejected.restaurant if rejected else answer.choice)
-    if rejected is None or answer.confidence < MIN_JEV_CONFIDENCE:
+    if rejected is None or not jev_client.supported(answer, MIN_JEV_CONFIDENCE):
         names = ", ".join(c.restaurant for c in active)
         return f"Which restaurant should I set aside: {names}?"
 

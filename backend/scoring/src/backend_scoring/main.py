@@ -40,7 +40,7 @@ from .schemas import (
 )
 from .storage import get_session, init_db
 
-PREFERENCE_MIN_CONFIDENCE = 0.7
+PREFERENCE_MIN_CONFIDENCE = 0.7  # on the probability Jev gave its choice; see jev_client.supported
 # Preference confirmation shares the request's research budget; cap its share.
 PREFERENCE_JEV_TIMEOUT_SECONDS = 15.0
 
@@ -193,7 +193,7 @@ async def _apply_preference_text(trip: Trip, text: str, session: Session, timeou
                 duration_ms=answer.duration_ms if i == 0 else 0,
             )
         )
-        if answer.choice == "yes" and answer.confidence >= PREFERENCE_MIN_CONFIDENCE:
+        if answer.choice == "yes" and jev_client.supported(answer, PREFERENCE_MIN_CONFIDENCE):
             setattr(trip, field, value)
             accepted.append(f"{field}={value}")
         elif answer.choice != "no":

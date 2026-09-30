@@ -710,3 +710,37 @@ def test_recall_offers_all_only_when_there_are_several_restaurants(monkeypatch, 
     summaries = {f"c{i + 1}": f"Sample restaurant {i + 1}" for i in range(count)}
     asyncio.run(jev_client.choose_recall("What did you find?", summaries, 5))
     assert ("all" in asked) is offers_all and "none" in asked
+
+
+@pytest.mark.parametrize(
+    ("probabilities", "confidence", "expected"),
+    [
+        ({"c1": 0.67, "none": 0.33}, 0.33, True),  # live recall: clear lead, low `confidence`
+        ({"c1": 0.63, "unclear": 0.37}, 0.25, True),  # live set-aside
+        ({"c1": 0.39, "all": 0.37, "none": 0.24}, 0.09, False),  # near-even split
+        ({"c1": 0.5, "none": 0.5}, 0.9, False),  # a tie is never a decision
+        (None, 0.7, True),  # no probabilities: falls back to `confidence`
+        (None, 0.4, False),
+    ],
+)
+def test_supported_uses_the_chosen_options_probability_and_lead(probabilities, confidence, expected):
+    assert jev_client.supported(_answer("c1", confidence, probabilities), 0.6) is expected
+
+
+def test_recall_and_set_aside_act_on_jevs_live_answer_shape(client: TestClient, world: FakeWorld, monkeypatch):
+    """Answers shaped like jev-latest's on 2026-09-30: a clear probability lead
+    with a low `confidence` value."""
+    trip_id, token, _ = _researched_trip(client)
+
+    async def recall(text, summaries, timeout):
+        return _answer("c1", 0.21, {"c1": 0.6, "none": 0.4})
+
+    async def rejected(text, labels, timeout):
+        key = next(k for k, label in labels.items() if "currently recommended" in label)
+        return _answer(key, 0.25, {key: 0.63, "unclear": 0.37})
+
+    monkeypatch.setattr(jev_client, "choose_recall", recall)
+    monkeypatch.setattr(jev_client, "choose_rejected", rejected)
+    assert _send(client, trip_id, token, text="What did you find?").json()["reply"].startswith("From the menus I checked")
+    reply = _send(client, trip_id, token, text="I don't like that one, show me another").json()["reply"]
+    assert reply.startswith("Okay, setting aside Green Leaf Cafe.")

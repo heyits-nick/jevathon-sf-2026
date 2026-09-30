@@ -52,6 +52,31 @@ class ChoiceAnswer:
 # tests/callers construct it directly.
 DishVerdict = ChoiceAnswer
 
+# How far Jev's own choice must lead the next option to count as a decision.
+MIN_PROBABILITY_MARGIN = 0.1
+
+
+def supported(answer: ChoiceAnswer, minimum: float) -> bool:
+    """Whether Jev's answer is strong enough to act on.
+
+    Uses the probability Jev gave its own choice, and requires it to lead the
+    runner-up by MIN_PROBABILITY_MARGIN. Jev's `confidence` field runs well
+    below that probability (live 2026-09-30 on jev-latest: recall chose c1 at
+    0.67 probability with 0.33 confidence), so thresholds on it asked travelers
+    to repeat answers Jev had clearly made. A near-even split, e.g. 0.39 vs 0.37,
+    still fails. Falls back to `confidence` when Jev sent no probabilities."""
+    probabilities = answer.probabilities or {}
+    if answer.choice not in probabilities:
+        return answer.confidence >= minimum
+    chosen = probabilities[answer.choice]
+    runner_up = max((p for k, p in probabilities.items() if k != answer.choice), default=0.0)
+    return chosen >= minimum and chosen - runner_up >= MIN_PROBABILITY_MARGIN
+
+
+def support(answer: ChoiceAnswer) -> float:
+    """The probability Jev gave its own choice (or `confidence` without probabilities); for ranking."""
+    return (answer.probabilities or {}).get(answer.choice, answer.confidence)
+
 
 async def ask_choice_questions(
     state: dict, questions: dict[str, dict], timeout: float = JEV_TIMEOUT_SECONDS

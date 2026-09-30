@@ -263,3 +263,27 @@ def test_clarification_clears_once_a_later_message_updates_preferences(client: T
     assert trip["status"] == "saved"
     assert trip["clarification"] is None
     assert trip["preferences"]["diet"] == "vegan"
+
+
+@pytest.mark.parametrize(
+    ("probabilities", "applied"),
+    [
+        ({"yes": 0.76, "unclear": 0.14, "no": 0.1}, True),  # live 2026-09-30: confidence 0.63, probability 0.76
+        ({"yes": 0.45, "unclear": 0.4, "no": 0.15}, False),  # near-even split stays a question
+    ],
+)
+def test_preference_is_decided_by_the_probability_jev_gave_its_choice(
+    client: TestClient, monkeypatch, probabilities: dict, applied: bool
+):
+    async def fake_confirm(message_text, candidates):
+        return {f: ChoiceAnswer("yes", 0.63, 50, probabilities) for f in candidates}
+
+    monkeypatch.setattr(jev_client, "confirm_preference_candidates", fake_confirm)
+    trip_id, token = _create_trip(client)
+    body = client.post(
+        f"/trips/{trip_id}/messages",
+        headers=_auth(token),
+        json={"client_message_id": str(uuid.uuid4()), "text": "I'm vegetarian"},
+    ).json()
+    assert (body["trip"]["preferences"]["diet"] == "vegetarian") is applied
+    assert (body["trip"]["status"] == "needs_clarification") is not applied

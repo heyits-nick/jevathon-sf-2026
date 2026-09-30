@@ -33,7 +33,7 @@ MAX_MENUS = 3  # menus kept and scored
 MAX_FETCH_ATTEMPTS = 5  # parallel page fetches; a page without priced dishes is not a menu
 MAX_SEARCH_RESULTS = 12
 RESEARCH_MAX_DISHES = 25
-MIN_JEV_CONFIDENCE = 0.6
+MIN_JEV_CONFIDENCE = 0.6  # on the probability Jev gave its choice; see jev_client.supported
 # Capability filter, not a quality judgment: the menu adapter reads public HTML
 # only, and these delivery apps render their dish lists with client-side JS.
 UNREADABLE_SOURCE_DOMAINS = {"seamless.com", "grubhub.com", "doordash.com", "ubereats.com", "postmates.com"}
@@ -228,9 +228,9 @@ async def _confirm_place(
     for i, proposal in enumerate(proposals):
         answer = per_candidate[i]
         trace(session, trip.id, "place:candidate", answer, choice=f"{proposal} → {answer.choice}", counts_time=False)
-        if answer.choice == "yes" and answer.confidence >= 0.5:
+        if answer.choice == "yes" and jev_client.supported(answer, 0.5):
             confirmed.append(proposal)
-    if single.choice != "yes" or single.confidence < MIN_JEV_CONFIDENCE or not confirmed:
+    if single.choice != "yes" or not jev_client.supported(single, MIN_JEV_CONFIDENCE) or not confirmed:
         return None
 
     place = ", ".join(confirmed)
@@ -373,9 +373,9 @@ async def _research_place(session: Session, trip: Trip, run: ResearchRun, budget
         if name_answer is not None:
             trace(session, trip.id, "restaurant_name", name_answer, counts_time=False)
             # Without a confident pick the full title is shown as-is, never a guessed segment.
-            if name_answer.choice.startswith("s") and name_answer.confidence >= MIN_JEV_CONFIDENCE:
+            if name_answer.choice.startswith("s") and jev_client.supported(name_answer, MIN_JEV_CONFIDENCE):
                 name = segments[int(name_answer.choice[1:])]
-        ranked.append((is_menu.confidence, result, name))
+        ranked.append((jev_client.support(is_menu), result, name))
     ranked.sort(key=lambda item: -item[0])
     chosen: list[tuple[dict, str]] = []
     per_name: dict[str, int] = {}
@@ -518,7 +518,7 @@ async def recommend(
         {key: summary(c, diet) for key, c in options.items()},
         timeout=timeout,
     )
-    if answer.choice == "none" or answer.confidence < 0.5:
+    if answer.choice == "none" or not jev_client.supported(answer, 0.5):
         trace(session, trip.id, stage, answer, choice="no clear fit")
         listed = "; ".join(summary(c, diet) for c in pool)
         return f"Jev didn't find a clear fit among them. What I found: {listed}."
