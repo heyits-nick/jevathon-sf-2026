@@ -897,3 +897,51 @@ def test_init_db_adds_source_verified_to_an_existing_trip_file(tmp_path, monkeyp
         get_engine.cache_clear()
     with sqlite3.connect(path) as db:
         assert db.execute("SELECT source_verified FROM researchcandidate WHERE id = 'sample'").fetchone() == (1,)
+
+
+def test_a_link_that_fails_before_research_retires_an_older_waiting_question(
+    client: TestClient, world: FakeWorld, monkeypatch
+):
+    """A newer link whose preference check hits a Jev outage never starts
+    research. It must still retire the older link's question, instead of
+    leaving it open only to set the traveler's answer aside."""
+    trip_id, token = _create_trip(client, diet="vegetarian")
+    world.place_unclear = True
+    _send(client, trip_id, token, source_url=POST_URL)
+
+    async def outage(text, candidates):
+        raise JevError("Sample outage.")
+
+    monkeypatch.setattr(jev_client, "confirm_preference_candidates", outage)
+    failed = _send(client, trip_id, token, source_url="https://www.instagram.com/reel/SAMPLE456/", text="I'm vegan")
+    assert "unavailable" in failed.json()["reply"]
+    trip = failed.json()["trip"]
+    assert trip["status"] == "failed" and trip["clarification"] is None
+
+    world.place_unclear = False
+    reply = _send(client, trip_id, token, text="It's the one at 18 Church Street").json()["reply"]
+    assert "newer link" not in reply
+    assert world.calls["resolve_place"] == 1  # no longer treated as an answer to the retired question
+    with Session(get_engine()) as session:
+        runs = session.exec(select(ResearchRun).where(ResearchRun.trip_id == trip_id).order_by(ResearchRun.created_at)).all()
+        assert [r.status for r in runs] == ["superseded", "failed"]
+
+
+def test_an_unclear_preference_on_a_link_is_reported_not_asked(client: TestClient, world: FakeWorld, monkeypatch):
+    """The link's research sets the trip's status and question, so an unclear
+    preference in the same message is reported, not asked as a question the
+    trip would no longer hold."""
+
+    async def unclear(text, candidates):
+        world.calls["confirm_preference_candidates"] += 1
+        return {field: _answer("unclear", 0.6) for field in candidates}
+
+    monkeypatch.setattr(jev_client, "confirm_preference_candidates", unclear)
+    trip_id, token = _create_trip(client, diet="vegetarian")
+    body = _send(client, trip_id, token, source_url=POST_URL, text="I'm vegan").json()
+
+    assert "Did you mean" not in body["reply"]
+    assert "I wasn't sure you meant to change your diet" in body["reply"]
+    trip = body["trip"]
+    assert trip["preferences"]["diet"] == "vegetarian"
+    assert trip["status"] == "ready" and trip["clarification"] is None

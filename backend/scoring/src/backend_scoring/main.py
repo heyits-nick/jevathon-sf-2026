@@ -162,12 +162,16 @@ async def _handle_preference_message(trip: Trip, text: str, session: Session, ti
     return reply or DEFAULT_REPLY
 
 
-async def _apply_preference_text(trip: Trip, text: str, session: Session, timeout: float) -> Optional[str]:
+async def _apply_preference_text(
+    trip: Trip, text: str, session: Session, timeout: float, ask: bool = True
+) -> Optional[str]:
     """Code proposes candidate diet/budget values (regex, never Jev — see
     preference_extraction.py), then Jev judges whether the message really
     asserts each one. Jev is never asked to invent a preference value, only
     to confirm or reject a candidate. Returns None when nothing was proposed
-    or applied; raises JevError when Jev is unavailable."""
+    or applied; raises JevError when Jev is unavailable. With ask=False an
+    unclear value is reported in the reply instead of becoming the trip's
+    question (a shared link's research sets the trip's status and question)."""
     candidates = preference_extraction.extract_candidates(text)
     if not candidates:
         return None
@@ -204,7 +208,12 @@ async def _apply_preference_text(trip: Trip, text: str, session: Session, timeou
     reply_parts = []
     if accepted:
         reply_parts.append(f"Updated your preferences: {', '.join(accepted)}.")
-    if unclear:
+    if unclear and not ask:
+        reply_parts.append(
+            f"I wasn't sure you meant to change your {' or '.join(unclear)}, so I left it as it was; "
+            "tell me directly if you want it updated."
+        )
+    elif unclear:
         trip.status = "needs_clarification"
         trip.clarification = f"Did you mean to update your {' and '.join(unclear)} preference? Please confirm."
         reply_parts.append(trip.clarification)
@@ -394,12 +403,17 @@ async def _handle_shared_link(trip: Trip, text: str, source_url: str, client_mes
     preference_reply = None
     if text:
         try:
-            preference_reply = await _apply_preference_text(trip, text, session, budget.step(PREFERENCE_JEV_TIMEOUT_SECONDS))
+            preference_reply = await _apply_preference_text(
+                trip, text, session, budget.step(PREFERENCE_JEV_TIMEOUT_SECONDS), ask=False
+            )
         except JevError:
-            # Newest link wins: a link shared while this one waited owns the trip's status.
-            if not _newer_link_saved(session, save):
-                trip.status = "failed"
-            return "I saved the link, but Jev (our decision service) was unavailable, so I couldn't research it. Share it again to retry."
+            # Recorded like a research failure: it retires earlier waiting
+            # questions, and a newer link keeps the trip's status.
+            return research.link_failed(
+                session, trip, save,
+                "I saved the link, but Jev (our decision service) was unavailable, so I couldn't research it. "
+                "Share it again to retry.",
+            )
         if _newer_link_saved(session, save):
             # The preference still applies, but the newer link owns the trip's
             # status and question; drop this request's unsaved changes to them.

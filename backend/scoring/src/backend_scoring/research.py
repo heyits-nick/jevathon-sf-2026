@@ -171,26 +171,10 @@ async def research_shared_link(session: Session, trip: Trip, save: SavedPost, bu
     Returns the reply; persists trip status, traces, and candidates. Pass the
     request's `budget` when earlier steps of the same request already spent some."""
     run = ResearchRun(trip_id=trip.id, save_id=save.id, diet=trip.diet)
-    session.add(run)
-    if _newer_run_exists(session, run):
+    if not _claim_trip(session, trip, run):
         # A link shared after this one (while this request waited, e.g. on the
         # preference check) owns the trip; leave its status and runs alone.
         return _set_aside(session, run)
-    # The newer link replaces any earlier run still waiting on the traveler.
-    for stale in session.exec(
-        select(ResearchRun).where(
-            ResearchRun.trip_id == trip.id,
-            ResearchRun.id != run.id,
-            ResearchRun.status.in_(("needs_place", "needs_diet")),
-        )
-    ).all():
-        stale.status = "superseded"
-        session.add(stale)
-    trip.status = "researching"
-    trip.clarification = None
-    session.add(run)
-    session.add(trip)
-    session.commit()
 
     budget = budget or Budget(budget_seconds())
     try:
@@ -209,6 +193,39 @@ async def research_shared_link(session: Session, trip: Trip, save: SavedPost, bu
     except Exception:  # never leave the trip stuck in "researching"
         log.exception("research failed unexpectedly")
         return _failed(session, trip, run, "I saved the link, but research failed unexpectedly. Share it again to retry.")
+
+
+def link_failed(session: Session, trip: Trip, save: SavedPost, reply: str) -> str:
+    """A shared link that failed before research could start (Jev unavailable
+    for its preference text). It still replaces earlier runs waiting on the
+    traveler, as a failure during research does; otherwise those runs would
+    stay open but be set aside by this newer link as soon as they resumed."""
+    run = ResearchRun(trip_id=trip.id, save_id=save.id, diet=trip.diet)
+    _claim_trip(session, trip, run)
+    return _failed(session, trip, run, reply)
+
+
+def _claim_trip(session: Session, trip: Trip, run: ResearchRun) -> bool:
+    """Make `run` the trip's current research, unless a newer link owns the
+    trip. Returns False (changing nothing but adding the run) in that case."""
+    session.add(run)
+    if _newer_run_exists(session, run):
+        return False
+    # The newer link replaces any earlier run still waiting on the traveler.
+    for stale in session.exec(
+        select(ResearchRun).where(
+            ResearchRun.trip_id == trip.id,
+            ResearchRun.id != run.id,
+            ResearchRun.status.in_(("needs_place", "needs_diet")),
+        )
+    ).all():
+        stale.status = "superseded"
+        session.add(stale)
+    trip.status = "researching"
+    trip.clarification = None
+    session.add(trip)
+    session.commit()
+    return True
 
 
 async def _identify_place(
