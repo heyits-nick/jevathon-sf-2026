@@ -397,14 +397,24 @@ async def _handle_shared_link(trip: Trip, text: str, source_url: str, client_mes
             preference_reply = await _apply_preference_text(trip, text, session, budget.step(PREFERENCE_JEV_TIMEOUT_SECONDS))
         except JevError:
             # Newest link wins: a link shared while this one waited owns the trip's status.
-            newer_save = session.exec(
-                select(SavedPost).where(SavedPost.trip_id == trip.id, SavedPost.created_at > save.created_at)
-            ).first()
-            if newer_save is None:
+            if not _newer_link_saved(session, save):
                 trip.status = "failed"
             return "I saved the link, but Jev (our decision service) was unavailable, so I couldn't research it. Share it again to retry."
+        if _newer_link_saved(session, save):
+            # The preference still applies, but the newer link owns the trip's
+            # status and question; drop this request's unsaved changes to them.
+            session.expire(trip, ["status", "clarification"])
     reply = await research.research_shared_link(session, trip, save, budget)
     return f"{preference_reply} {reply}" if preference_reply else reply
+
+
+def _newer_link_saved(session: Session, save: SavedPost) -> bool:
+    # No autoflush: this request's unsaved trip changes must not reach the
+    # database before the caller decides whether to keep them.
+    with session.no_autoflush:
+        return session.exec(
+            select(SavedPost).where(SavedPost.trip_id == save.trip_id, SavedPost.created_at > save.created_at)
+        ).first() is not None
 
 
 async def _converse(

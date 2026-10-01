@@ -113,6 +113,8 @@ def summary(candidate: ResearchCandidate, diet: str) -> str:
     )
     if examples:
         text += f" (e.g. {', '.join(examples)})"
+    if not candidate.source_verified:
+        text += " [unverified source: Jev wasn't confident it is a menu near the place]"
     return text
 
 
@@ -125,16 +127,28 @@ def fact_line(candidate: ResearchCandidate, diet: str) -> str:
 
 
 def eligible(candidate: ResearchCandidate) -> bool:
-    """Evidence requirement: at least one dish Jev judged a confident yes."""
-    return dish_counts(candidate)[0] > 0 and not candidate.rejected
+    """Evidence requirement: a source Jev confidently judged a nearby menu, and
+    at least one dish Jev judged a confident yes."""
+    return candidate.source_verified and dish_counts(candidate)[0] > 0 and not candidate.rejected
+
+
+UNVERIFIED_REASON = "Unverified source: Jev wasn't confident this page is a restaurant menu near the post's place, so it isn't recommended."
+
+
+def runs_newest_first(session: Session, trip_id: str) -> list[ResearchRun]:
+    """Runs in the order their links were shared, newest first. A run's own
+    creation time can lag its link (it starts after the preference check)."""
+    return session.exec(
+        select(ResearchRun)
+        .join(SavedPost, SavedPost.id == ResearchRun.save_id)
+        .where(ResearchRun.trip_id == trip_id)
+        .order_by(SavedPost.created_at.desc(), ResearchRun.created_at.desc())
+    ).all()
 
 
 def latest_candidates(session: Session, trip_id: str) -> tuple[ResearchRun | None, list[ResearchCandidate]]:
     """Candidates of the most recent run that produced any, in Jev rank order."""
-    runs = session.exec(
-        select(ResearchRun).where(ResearchRun.trip_id == trip_id).order_by(ResearchRun.created_at.desc())
-    ).all()
-    for run in runs:
+    for run in runs_newest_first(session, trip_id):
         candidates = session.exec(select(ResearchCandidate).where(ResearchCandidate.run_id == run.id)).all()
         if candidates:
             return run, sorted(candidates, key=rank_key)
@@ -156,13 +170,22 @@ async def research_shared_link(session: Session, trip: Trip, save: SavedPost, bu
     """Runs with the user's message and the SavedPost already committed.
     Returns the reply; persists trip status, traces, and candidates. Pass the
     request's `budget` when earlier steps of the same request already spent some."""
+    run = ResearchRun(trip_id=trip.id, save_id=save.id, diet=trip.diet)
+    session.add(run)
+    if _newer_run_exists(session, run):
+        # A link shared after this one (while this request waited, e.g. on the
+        # preference check) owns the trip; leave its status and runs alone.
+        return _set_aside(session, run)
     # The newer link replaces any earlier run still waiting on the traveler.
     for stale in session.exec(
-        select(ResearchRun).where(ResearchRun.trip_id == trip.id, ResearchRun.status.in_(("needs_place", "needs_diet")))
+        select(ResearchRun).where(
+            ResearchRun.trip_id == trip.id,
+            ResearchRun.id != run.id,
+            ResearchRun.status.in_(("needs_place", "needs_diet")),
+        )
     ).all():
         stale.status = "superseded"
         session.add(stale)
-    run = ResearchRun(trip_id=trip.id, save_id=save.id, diet=trip.diet)
     trip.status = "researching"
     trip.clarification = None
     session.add(run)
@@ -253,9 +276,8 @@ async def _continue_with_place(session: Session, trip: Trip, run: ResearchRun, b
 
 def waiting_run(session: Session, trip_id: str) -> ResearchRun | None:
     """The trip's newest run, when it is waiting on the traveler for a place or diet."""
-    newest = session.exec(
-        select(ResearchRun).where(ResearchRun.trip_id == trip_id).order_by(ResearchRun.created_at.desc())
-    ).first()
+    runs = runs_newest_first(session, trip_id)
+    newest = runs[0] if runs else None
     return newest if newest is not None and newest.status in ("needs_place", "needs_diet") else None
 
 
@@ -363,11 +385,12 @@ async def _research_place(session: Session, trip: Trip, run: ResearchRun, budget
             session, trip.id, "source_selection", is_menu,
             choice=f"{result['title'][:80]} → {is_menu.choice}", counts_time=i == 0,
         )
-        # Jev's call. A low-confidence "yes" is only a lower-priority fetch attempt
-        # (ranked below), never a candidate: a page counts only if it yields priced
-        # dishes, and every dish is still judged by Jev.
+        # Jev's call. A weak "yes" is still fetched, at lower priority, but its
+        # candidate is marked unverified and never recommended: priced dishes
+        # prove a menu, not that the restaurant is near the place.
         if is_menu.choice != "yes":
             continue
+        verified = jev_client.supported(is_menu, MIN_JEV_CONFIDENCE)
         segments = result["title_segments"] or [result["title"]]
         name = segments[0] if len(segments) == 1 else result["title"]
         if name_answer is not None:
@@ -375,16 +398,16 @@ async def _research_place(session: Session, trip: Trip, run: ResearchRun, budget
             # Without a confident pick the full title is shown as-is, never a guessed segment.
             if name_answer.choice.startswith("s") and jev_client.supported(name_answer, MIN_JEV_CONFIDENCE):
                 name = segments[int(name_answer.choice[1:])]
-        ranked.append((jev_client.support(is_menu), result, name))
+        ranked.append((jev_client.support(is_menu), result, name, verified))
     ranked.sort(key=lambda item: -item[0])
-    chosen: list[tuple[dict, str]] = []
+    chosen: list[tuple[dict, str, bool]] = []
     per_name: dict[str, int] = {}
-    for _, result, name in ranked:
+    for _, result, name, verified in ranked:
         # At most two sources per restaurant (the second is a fallback listing).
         key = _name_key(name)
         if per_name.get(key, 0) < 2 and len(chosen) < MAX_FETCH_ATTEMPTS:
             per_name[key] = per_name.get(key, 0) + 1
-            chosen.append((result, name))
+            chosen.append((result, name, verified))
     if not chosen:
         return _failed(
             session, trip, run,
@@ -400,10 +423,11 @@ async def _research_place(session: Session, trip: Trip, run: ResearchRun, budget
         result = await asyncio.wait_for(menu_fetch_client.fetch_menu(url, name), fetch_timeout)
         return result, int((time.monotonic() - started) * 1000)
 
-    fetched = await asyncio.gather(*(fetch(r["url"], name) for r, name in chosen), return_exceptions=True)
+    fetched = await asyncio.gather(*(fetch(r["url"], name) for r, name, _ in chosen), return_exceptions=True)
     to_score: list[tuple[str, str, dict, int]] = []
+    verified_ids: set[str] = set()
     kept_names: set[str] = set()
-    for (result, name), outcome in zip(chosen, fetched):
+    for (result, name, verified), outcome in zip(chosen, fetched):
         if _name_key(name) in kept_names or len(to_score) >= MAX_MENUS:
             continue  # already have this restaurant's menu, or enough menus
         if isinstance(outcome, MenuFetchError):
@@ -415,6 +439,8 @@ async def _research_place(session: Session, trip: Trip, run: ResearchRun, budget
         else:
             candidate_id = str(uuid.uuid4())
             kept_names.add(_name_key(name))
+            if verified:
+                verified_ids.add(candidate_id)
             to_score.append((candidate_id, name, _namespace_evidence(outcome[0], candidate_id[:8]), outcome[1]))
 
     score_timeout = budget.step(25, reserve=6) if to_score else 0
@@ -439,6 +465,8 @@ async def _research_place(session: Session, trip: Trip, run: ResearchRun, budget
             menu_url=fetch_result.get("menu_url") or "",
             score_result=score,
             evidence=score.get("evidence") or [],
+            source_verified=candidate_id in verified_ids,
+            recommendation_reason=None if candidate_id in verified_ids else UNVERIFIED_REASON,
         )
         candidates.append(candidate)
         verdicts = [d["verdict"] for d in score["dishes"]]
@@ -480,7 +508,7 @@ async def _research_place(session: Session, trip: Trip, run: ResearchRun, budget
     if _newer_run_exists(session, run):
         for candidate in candidates:
             candidate.rank = None
-            candidate.recommendation_reason = None
+            candidate.recommendation_reason = None if candidate.source_verified else UNVERIFIED_REASON
             session.add(candidate)
         return _set_aside(session, run, kept)
 
@@ -510,6 +538,12 @@ async def recommend(
     diet = scored_diet or "your"
     pool = [c for c in candidates if eligible(c)]
     if not pool:
+        unverified = [c.restaurant for c in candidates if not c.source_verified and not c.rejected and dish_counts(c)[0] > 0]
+        if unverified:
+            return (
+                f"Jev wasn't confident that {', '.join(unverified)} {'is' if len(unverified) == 1 else 'are'} near {place}, "
+                "so I'm not recommending a menu from this research."
+            )
         return f"None of those menus had dishes Jev judged {diet}-compatible with high confidence, so I'm not recommending one."
     options = option_keys(pool)
     answer = await jev_client.choose_recommendation(
@@ -566,12 +600,14 @@ def _warning_text(warnings: list[str]) -> str:
 
 
 def _newer_run_exists(session: Session, run: ResearchRun) -> bool:
-    """A link shared after this run started owns the trip's status,
-    clarification and ranking; this run must no longer write them."""
-    newest = session.exec(
-        select(ResearchRun).where(ResearchRun.trip_id == run.trip_id).order_by(ResearchRun.created_at.desc())
-    ).first()
-    return newest is not None and newest.id != run.id
+    """A link shared after this run's link owns the trip's status,
+    clarification and ranking; this run must no longer write them. Ordered by
+    when each link was saved, so a run that started late (its request waited on
+    the preference check) can't take over from a link shared after it."""
+    save = session.get(SavedPost, run.save_id)
+    return session.exec(
+        select(SavedPost).where(SavedPost.trip_id == run.trip_id, SavedPost.created_at > save.created_at)
+    ).first() is not None
 
 
 def other_run_recommends(session: Session, run: ResearchRun) -> bool:

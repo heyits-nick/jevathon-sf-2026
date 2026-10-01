@@ -21,7 +21,7 @@ from sqlmodel import Session, select
 
 from backend_scoring import jev_client, menu_fetch_client
 from backend_scoring.jev_client import ChoiceAnswer, JevError
-from backend_scoring.models import ResearchCandidate, ResearchRun, Trip, TripMessage
+from backend_scoring.models import ResearchCandidate, ResearchRun, SavedPost, Trip, TripMessage
 from backend_scoring.storage import get_engine
 
 POST_URL = "https://www.instagram.com/reel/SAMPLE123/"
@@ -683,13 +683,14 @@ def test_a_place_answer_that_a_newer_link_replaced_does_not_repeat_the_old_quest
 ):
     trip_id, token = _create_trip(client, diet="vegetarian")
     world.place_unclear = True
-    body = _send(client, trip_id, token, source_url=POST_URL).json()
-    save_id = body["trip"]["saves"][0]["id"]
+    _send(client, trip_id, token, source_url=POST_URL)
     original = jev_client.resolve_place
 
     async def newer_link_arrives_first(*args, **kwargs):
         with Session(get_engine()) as session:
-            session.add(ResearchRun(trip_id=trip_id, save_id=save_id, status="researching"))
+            newer_save = SavedPost(trip_id=trip_id, source_url="https://www.instagram.com/reel/SAMPLE456/")
+            session.add(newer_save)
+            session.add(ResearchRun(trip_id=trip_id, save_id=newer_save.id, status="researching"))
             session.commit()
         return await original(*args, **kwargs)  # still unclear
 
@@ -756,3 +757,143 @@ def test_recall_and_set_aside_act_on_jevs_live_answer_shape(client: TestClient, 
 )
 def test_supported_accepts_a_lead_of_exactly_the_margin(probabilities, minimum, expected):
     assert jev_client.supported(_answer("c1", 0.1, probabilities), minimum) is expected
+
+
+def _hold_first_preference_check(monkeypatch):
+    """The first preference check waits until released; later ones answer normally."""
+    reached, release = asyncio.Event(), asyncio.Event()
+    original = jev_client.confirm_preference_candidates
+    calls = 0
+
+    async def held(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            reached.set()
+            await release.wait()
+        return await original(*args, **kwargs)
+
+    monkeypatch.setattr(jev_client, "confirm_preference_candidates", held)
+    return reached, release
+
+
+def _older_link_with_text_then_newer_link(trip_id: str, token: str, reached, release, world: FakeWorld | None = None):
+    from backend_scoring.main import app
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as http:
+
+            def share(**extra):
+                body = {"client_message_id": str(uuid.uuid4()), "source_url": POST_URL, **extra}
+                return http.post(f"/trips/{trip_id}/messages", headers=_auth(token), json=body)
+
+            older = asyncio.create_task(share(text="I'm vegetarian"))
+            await reached.wait()
+            newer = await share()
+            if world is not None:
+                world.place_unclear = False
+            release.set()
+            return await older, newer
+
+    return asyncio.run(run())
+
+
+def test_a_link_shared_later_wins_even_if_the_older_link_starts_research_after_it(
+    client: TestClient, world: FakeWorld, monkeypatch
+):
+    """The older link waits in its preference check while the newer link is
+    researched, so the older run is created last. Shared order decides."""
+    trip_id, token = _create_trip(client, diet="vegetarian")
+    reached, release = _hold_first_preference_check(monkeypatch)
+    older, newer = _older_link_with_text_then_newer_link(trip_id, token, reached, release)
+
+    assert newer.json()["trip"]["status"] == "ready"
+    assert "newer link" in older.json()["reply"]
+    trip = client.get(f"/trips/{trip_id}", headers=_auth(token)).json()
+    assert trip["status"] == "ready"
+    assert trip["recommended_candidate_ids"] == newer.json()["trip"]["recommended_candidate_ids"]
+    with Session(get_engine()) as session:
+        runs = session.exec(select(ResearchRun).where(ResearchRun.trip_id == trip_id).order_by(ResearchRun.created_at)).all()
+        assert [r.status for r in runs] == ["ready", "superseded"]  # the newer link's run was created first
+
+
+def test_a_newer_links_place_question_survives_an_older_link_finishing_later(
+    client: TestClient, world: FakeWorld, monkeypatch
+):
+    trip_id, token = _create_trip(client, diet="vegetarian")
+    world.place_unclear = True
+    reached, release = _hold_first_preference_check(monkeypatch)
+    older, newer = _older_link_with_text_then_newer_link(trip_id, token, reached, release, world)
+
+    assert newer.json()["trip"]["status"] == "needs_clarification"
+    assert "newer link" in older.json()["reply"]
+    trip = client.get(f"/trips/{trip_id}", headers=_auth(token)).json()
+    assert trip["status"] == "needs_clarification" and "Which place" in trip["clarification"]
+
+    answer = _send(client, trip_id, token, text="It's the one at 18 Church Street").json()
+    assert answer["reply"].startswith("Got it: 18 Church Street.")  # the newer link's waiting run resumed
+    assert answer["trip"]["status"] == "ready"
+
+
+def _weak_source(url: str, monkeypatch, world: FakeWorld) -> None:
+    async def select(place, diet, results, timeout):
+        world.calls["select_sources"] += 1
+        return {
+            i: (_answer("yes", 0.22 if r["url"] == url else 0.9) if r["url"].endswith("/menu") else _answer("no"), None)
+            for i, r in enumerate(results)
+        }
+
+    monkeypatch.setattr(jev_client, "select_sources", select)
+
+
+def test_a_weakly_judged_source_is_shown_unverified_and_never_recommended(
+    client: TestClient, world: FakeWorld, monkeypatch
+):
+    _weak_source("https://stonegrill.example/menu", monkeypatch, world)
+    trip_id, token, body = _researched_trip(client)
+    by_name = _by_name(body["trip"])
+    assert body["trip"]["recommended_candidate_ids"] == [by_name["Green Leaf Cafe"]["id"]]
+    assert by_name["Stone Grill"]["recommendation_reason"].startswith("Unverified source")
+
+    recall = _send(client, trip_id, token, text="What did you find for me?").json()["reply"]
+    assert "Stone Grill: " in recall and "[unverified source" in recall
+
+    # Stone Grill has a confident vegetarian dish, but its source is unverified.
+    alternative = _send(client, trip_id, token, text="I don't like Green Leaf, show me another").json()
+    assert "None of the other researched menus qualifies" in alternative["reply"]
+    assert alternative["trip"]["recommended_candidate_ids"] == []
+    assert _by_name(alternative["trip"])["Stone Grill"]["recommendation_reason"].startswith("Unverified source")
+
+
+def test_research_with_only_unverified_sources_says_why_nothing_is_recommended(
+    client: TestClient, world: FakeWorld, monkeypatch
+):
+    _weak_source("https://greenleaf.example/menu", monkeypatch, world)
+    monkeypatch.setitem(SAMPLE_MENUS, "https://stonegrill.example/menu", [("Ribeye Steak", "12oz ribeye")])
+    body = _researched_trip(client)[2]
+    assert "Jev wasn't confident that Green Leaf Cafe is near" in body["reply"]
+    assert body["trip"]["recommended_candidate_ids"] == []
+
+
+def test_init_db_adds_source_verified_to_an_existing_trip_file(tmp_path, monkeypatch):
+    import sqlite3
+
+    from backend_scoring.storage import init_db
+
+    path = tmp_path / "older.db"
+    with sqlite3.connect(path) as db:  # researchcandidate as created before source_verified existed
+        db.execute(
+            "CREATE TABLE researchcandidate (id VARCHAR PRIMARY KEY, trip_id VARCHAR, run_id VARCHAR, restaurant VARCHAR, "
+            "menu_url VARCHAR, score_result JSON, evidence JSON, recommendation_reason VARCHAR, rank INTEGER, "
+            "rejected BOOLEAN NOT NULL, created_at DATETIME)"
+        )
+        db.execute("INSERT INTO researchcandidate (id, rejected) VALUES ('sample', 0)")
+    monkeypatch.setenv("TRIP_DB_PATH", str(path))
+    get_engine.cache_clear()
+    try:
+        init_db()
+        init_db()  # idempotent
+    finally:
+        get_engine.cache_clear()
+    with sqlite3.connect(path) as db:
+        assert db.execute("SELECT source_verified FROM researchcandidate WHERE id = 'sample'").fetchone() == (1,)

@@ -12,6 +12,7 @@ from . import jev_client
 from .models import ResearchCandidate, ResearchRun, Trip
 from .research import (
     MIN_JEV_CONFIDENCE,
+    UNVERIFIED_REASON,
     eligible,
     fact_line,
     option_keys,
@@ -105,7 +106,8 @@ async def alternative(session: Session, trip: Trip, text: str, run: ResearchRun,
         others = "; ".join(summary(c, diet) for c in remaining)
         suffix = f" The other menus I checked: {others}." if others else ""
         return (
-            f"{lead} None of the other researched menus had dishes judged {diet}-compatible with high confidence."
+            f"{lead} None of the other researched menus qualifies: a recommendation needs a dish judged "
+            f"{diet}-compatible with high confidence, from a source Jev confirmed is a nearby menu."
             f"{suffix} Share another post or place and I can research it.{_diet_note(trip, run)}"
         )
     reply = await recommend(
@@ -117,7 +119,7 @@ async def alternative(session: Session, trip: Trip, text: str, run: ResearchRun,
         # recommendation. The rejection above is still the traveler's choice.
         for candidate in remaining:
             candidate.rank = None
-            candidate.recommendation_reason = None
+            candidate.recommendation_reason = None if candidate.source_verified else UNVERIFIED_REASON
         return (
             f"{lead} You shared a newer link while I was choosing, and its research now has the recommendation."
             f"{_diet_note(trip, run)}"

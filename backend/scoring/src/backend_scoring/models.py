@@ -117,4 +117,7 @@ class ResearchCandidate(SQLModel, table=True):
     recommendation_reason: Optional[str] = None
     rank: Optional[int] = None
     rejected: bool = False
+    # Jev's "nearby restaurant menu" judgment for the source passed the support
+    # check. Weak leads are fetched and shown, but never recommended.
+    source_verified: bool = True
     created_at: datetime = Field(default_factory=_now)

@@ -8,6 +8,7 @@ before use so each test run gets an isolated database file.
 import os
 from functools import lru_cache
 
+from sqlalchemy import inspect, text
 from sqlmodel import Session, SQLModel, create_engine
 
 
@@ -20,8 +21,20 @@ def get_engine():
     return create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
 
 
+# Columns added to tables after a trip file may already exist; create_all never adds columns.
+_ADDED_COLUMNS = {"researchcandidate": {"source_verified": "BOOLEAN NOT NULL DEFAULT 1"}}
+
+
 def init_db() -> None:
-    SQLModel.metadata.create_all(get_engine())
+    engine = get_engine()
+    SQLModel.metadata.create_all(engine)
+    inspector = inspect(engine)
+    with engine.begin() as connection:
+        for table, columns in _ADDED_COLUMNS.items():
+            existing = {c["name"] for c in inspector.get_columns(table)}
+            for name, ddl in columns.items():
+                if name not in existing:
+                    connection.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
 
 
 def get_session():
