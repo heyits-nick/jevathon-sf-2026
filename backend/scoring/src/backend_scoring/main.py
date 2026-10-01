@@ -140,7 +140,7 @@ def _serialize_trip(trip: Trip, session: Session) -> TripOut:
             }
             for c in candidates
         ],
-        recommended_candidate_ids=[c.id for c in candidates if c.rank == 0 and not c.rejected],
+        recommended_candidate_ids=[c.id for c in candidates if c.rank == 0 and not c.rejected and c.source_verified],
         selected_candidate_id=trip.selected_candidate_id,
         clarification=trip.clarification,
         messages=[MessageOut(id=m.id, role=m.role, text=m.text, created_at=m.created_at) for m in messages],

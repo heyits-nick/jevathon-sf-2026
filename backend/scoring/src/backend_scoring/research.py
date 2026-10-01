@@ -114,7 +114,7 @@ def summary(candidate: ResearchCandidate, diet: str) -> str:
     if examples:
         text += f" (e.g. {', '.join(examples)})"
     if not candidate.source_verified:
-        text += " [unverified source: Jev wasn't confident it is a menu near the place]"
+        text += " [unverified source: not confirmed as a menu near the place]"
     return text
 
 

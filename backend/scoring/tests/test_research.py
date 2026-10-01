@@ -878,7 +878,7 @@ def test_research_with_only_unverified_sources_says_why_nothing_is_recommended(
 def test_init_db_adds_source_verified_to_an_existing_trip_file(tmp_path, monkeypatch):
     import sqlite3
 
-    from backend_scoring.storage import init_db
+    from backend_scoring.storage import LEGACY_UNVERIFIED_REASON, init_db
 
     path = tmp_path / "older.db"
     with sqlite3.connect(path) as db:  # researchcandidate as created before source_verified existed
@@ -887,7 +887,10 @@ def test_init_db_adds_source_verified_to_an_existing_trip_file(tmp_path, monkeyp
             "menu_url VARCHAR, score_result JSON, evidence JSON, recommendation_reason VARCHAR, rank INTEGER, "
             "rejected BOOLEAN NOT NULL, created_at DATETIME)"
         )
-        db.execute("INSERT INTO researchcandidate (id, rejected) VALUES ('sample', 0)")
+        db.execute(
+            "INSERT INTO researchcandidate (id, rejected, rank, recommendation_reason) "
+            "VALUES ('recommended', 0, 0, 'Sample older pick'), ('set_aside', 1, NULL, 'You set this one aside; kept for reference.')"
+        )
     monkeypatch.setenv("TRIP_DB_PATH", str(path))
     get_engine.cache_clear()
     try:
@@ -896,7 +899,23 @@ def test_init_db_adds_source_verified_to_an_existing_trip_file(tmp_path, monkeyp
     finally:
         get_engine.cache_clear()
     with sqlite3.connect(path) as db:
-        assert db.execute("SELECT source_verified FROM researchcandidate WHERE id = 'sample'").fetchone() == (1,)
+        rows = db.execute(
+            "SELECT id, source_verified, rank, recommendation_reason FROM researchcandidate ORDER BY id"
+        ).fetchall()
+    # Older rows never recorded the source check: unverified, and no longer recommended.
+    assert rows == [
+        ("recommended", 0, None, LEGACY_UNVERIFIED_REASON),
+        ("set_aside", 0, None, "You set this one aside; kept for reference."),
+    ]
+
+
+def test_init_db_keeps_candidates_written_after_the_column_exists(client: TestClient, world: FakeWorld):
+    from backend_scoring.storage import init_db
+
+    trip_id, token, body = _researched_trip(client)
+    init_db()  # a restart must not backfill rows that recorded their own source check
+    trip = client.get(f"/trips/{trip_id}", headers=_auth(token)).json()
+    assert trip["recommended_candidate_ids"] == body["trip"]["recommended_candidate_ids"] != []
 
 
 def test_a_link_that_fails_before_research_retires_an_older_waiting_question(
