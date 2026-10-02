@@ -13,12 +13,13 @@ export function Conversation({ messages }: { messages: Message[] }) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [last]);
 
-  if (messages.length === 0) {
-    return <p className="text-sm text-muted-foreground">No messages yet. Share a post link or ask a question below.</p>;
-  }
-
+  // The live region stays mounted while empty so the first reply is announced.
   return (
-    <ol ref={list} className="-mx-1 flex max-h-[26rem] flex-col gap-2 overflow-y-auto px-1" aria-live="polite" aria-label="Conversation">
+    <>
+      {messages.length === 0 && (
+        <p className="text-sm text-muted-foreground">No messages yet. Share a post link or ask a question below.</p>
+      )}
+      <ol ref={list} className="-mx-1 flex max-h-[26rem] flex-col gap-2 overflow-y-auto px-1" aria-live="polite" aria-label="Conversation">
       {messages.map((m) => (
         <li key={m.id} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
           <p
@@ -34,6 +35,7 @@ export function Conversation({ messages }: { messages: Message[] }) {
           </p>
         </li>
       ))}
-    </ol>
+      </ol>
+    </>
   );
 }

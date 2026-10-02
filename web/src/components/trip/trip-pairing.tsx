@@ -66,7 +66,7 @@ export function TripPairing({ onCreate, pending, error }: TripPairingProps) {
               aria-pressed={mode === value}
               onClick={() => setMode(value)}
               className={cn(
-                "h-10 rounded-lg text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                "h-10 rounded-lg text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring",
                 mode === value ? "bg-card font-semibold text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
               )}
             >
@@ -74,7 +74,13 @@ export function TripPairing({ onCreate, pending, error }: TripPairingProps) {
             </button>
           ))}
         </div>
-        {mode === "new" ? <TripStartForm onCreate={onCreate} pending={pending} error={error} /> : <TripResumeForm />}
+        {/* Both forms stay mounted so typed values survive switching modes. */}
+        <div hidden={mode !== "new"}>
+          <TripStartForm onCreate={onCreate} pending={pending} error={error} />
+        </div>
+        <div hidden={mode !== "existing"}>
+          <TripResumeForm />
+        </div>
       </section>
     </div>
   );
