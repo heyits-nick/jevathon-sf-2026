@@ -35,6 +35,38 @@ Everything above is real, merged, working code — not planning docs. If you're
 picking this up cold: `git log --oneline main` to see if anything landed after
 this snapshot before you build on top of it.
 
+## Update: automatic link research (PR #32, stacked on #31)
+
+`POST /trips/{id}/messages` with a `source_url` now researches the link
+(`backend/scoring/src/backend_scoring/research.py`): caption from the public
+page via the menu bridge (`caption.py`, deterministic extraction) → Jev
+resolves the place → Browserbase Search → Jev selects menu sources →
+up to 3 menus kept from up to 5 fetch attempts → Jev per-dish scoring (shared
+with `/score` in `scoring.py`) → Jev recommendation among researched IDs.
+Text messages after research go to Jev intent → recall / alternative
+(`conversation.py`). New tables `ResearchRun` and `ResearchCandidate`; no
+existing table altered. Every Jev call writes a `DecisionTrace`.
+
+Start (repo root, two terminals):
+
+```bash
+node --env-file=.env backend/menu_fetch/cli.mjs serve
+cd backend/scoring && uv run uvicorn backend_scoring.main:app --host 127.0.0.1 --port 8000 --env-file ../../.env
+```
+
+Demo sequence: README → "Reproducible demo: shared link → researched
+recommendation" (test input `https://www.instagram.com/reel/DdouiWwP1oe/` on a
+trip with diet `vegetarian`). Tests: `uv run pytest -q` (61 passing;
+`tests/test_research.py` uses labeled fake providers).
+
+Known limits: research runs inside the request (4–6 s measured in the
+earlier local session, 45 s cap), so a crash mid-run can leave status
+`researching`; a reply to a place clarification resumes research only when it
+names a place (an address, "at/near <Name>", or a place the caption mentioned)
+and Jev confirms it; menu yield depends on search results. The gap list
+below predates this work: items 1, 2 and 4 are addressed by PR #32 once it
+merges.
+
 ## What exists and runs right now, per component
 
 - **`backend/scoring/`** (Python 3.12, FastAPI, SQLModel/SQLite, `uv`) — this

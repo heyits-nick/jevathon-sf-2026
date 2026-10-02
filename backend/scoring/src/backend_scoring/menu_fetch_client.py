@@ -21,7 +21,20 @@ class MenuFetchError(Exception):
         super().__init__(message)
 
 
-async def fetch_menu(menu_url: str, restaurant: str) -> dict:
+async def fetch_menu(menu_url: str, restaurant: str, timeout: float = FETCH_TIMEOUT_SECONDS) -> dict:
+    body = {"menu_url": menu_url}
+    if restaurant:
+        body["restaurant"] = restaurant
+    return await _post("/fetch-menu", body, timeout)
+
+
+async def search_sources(query: str, limit: int = 5, timeout: float = 15.0) -> dict:
+    """Browserbase Search via the bridge: `{query, results:[{id,title,url,snippet}], timing_ms}`.
+    Retrieval only — Jev chooses which results to use."""
+    return await _post("/search-sources", {"query": query, "limit": limit}, timeout)
+
+
+async def _post(path: str, body: dict, timeout: float) -> dict:
     base_url = os.environ.get("MENU_FETCH_BASE_URL", "http://127.0.0.1:8101")
     token = os.environ.get("MENU_FETCH_TOKEN")
     headers = {"Content-Type": "application/json"}
@@ -29,12 +42,10 @@ async def fetch_menu(menu_url: str, restaurant: str) -> dict:
         headers["Authorization"] = f"Bearer {token}"
 
     try:
-        async with httpx.AsyncClient(timeout=FETCH_TIMEOUT_SECONDS) as client:
-            response = await client.post(
-                f"{base_url.rstrip('/')}/fetch-menu",
-                json={"menu_url": menu_url, "restaurant": restaurant},
-                headers=headers,
-            )
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.post(f"{base_url.rstrip('/')}{path}", json=body, headers=headers)
+    except httpx.TimeoutException as exc:
+        raise MenuFetchError(504, "TIMEOUT", "The evidence service timed out.", retryable=True) from exc
     except httpx.HTTPError as exc:
         raise MenuFetchError(
             502, "PROVIDER_FAILURE", "Could not reach the menu evidence service.", retryable=True

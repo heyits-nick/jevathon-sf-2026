@@ -8,7 +8,7 @@ scoring are a later slice (see docs/roadmap.md P0/P1); nothing here fabricates
 those decisions.
 """
 
-import os
+import asyncio
 import time
 from contextlib import asynccontextmanager
 from typing import Optional
@@ -19,15 +19,16 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import literal_column
 from sqlmodel import Session, select
 
-from . import auth, jev_client, menu_fetch_client, preference_extraction
+from . import auth, conversation, jev_client, menu_fetch_client, preference_extraction, research, scoring
 from .jev_client import JevError
 from .menu_fetch_client import MenuFetchError
-from .models import DecisionTrace, SavedPost, Trip, TripMessage
+from sqlalchemy.exc import IntegrityError
+
+from .models import DecisionTrace, ResearchCandidate, ResearchRun, SavedPost, Trip, TripMessage
 from .schemas import (
     CreateTripRequest,
     CreateTripResponse,
     DecisionTraceOut,
-    EvidenceOut,
     MessageOut,
     Preferences,
     PostMessageRequest,
@@ -35,13 +36,13 @@ from .schemas import (
     SavedPostOut,
     ScoreRequest,
     ScoreResponse,
-    ScoredDishOut,
     TripOut,
 )
 from .storage import get_session, init_db
 
-MAX_DISHES_PER_SCORE = 50
-PREFERENCE_MIN_CONFIDENCE = 0.7
+PREFERENCE_MIN_CONFIDENCE = 0.7  # on the probability Jev gave its choice; see jev_client.supported
+# Preference confirmation shares the request's research budget; cap its share.
+PREFERENCE_JEV_TIMEOUT_SECONDS = 15.0
 
 
 class ApiError(Exception):
@@ -118,14 +119,28 @@ def _serialize_trip(trip: Trip, session: Session) -> TripOut:
         .where(DecisionTrace.trip_id == trip.id)
         .order_by(DecisionTrace.created_at, literal_column("decisiontrace.rowid"))
     ).all()
+    candidates = sorted(
+        session.exec(select(ResearchCandidate).where(ResearchCandidate.trip_id == trip.id)).all(),
+        key=lambda c: (c.rank is None, c.rank or 0, -c.created_at.timestamp()),
+    )
     return TripOut(
         id=trip.id,
         destination=trip.destination,
         preferences=Preferences(diet=trip.diet, budget=trip.budget, notes=trip.notes),
         status=trip.status,
         saves=[SavedPostOut(**s.model_dump()) for s in saves],
-        candidates=[],
-        recommended_candidate_ids=[],
+        candidates=[
+            {
+                "id": c.id,
+                "restaurant": c.restaurant,
+                "menu_url": c.menu_url,
+                "score_result": c.score_result,
+                "evidence": c.evidence,
+                "recommendation_reason": c.recommendation_reason,
+            }
+            for c in candidates
+        ],
+        recommended_candidate_ids=[c.id for c in candidates if c.rank == 0 and not c.rejected and c.source_verified],
         selected_candidate_id=trip.selected_candidate_id,
         clarification=trip.clarification,
         messages=[MessageOut(id=m.id, role=m.role, text=m.text, created_at=m.created_at) for m in messages],
@@ -133,19 +148,38 @@ def _serialize_trip(trip: Trip, session: Session) -> TripOut:
     )
 
 
-async def _handle_preference_message(trip: Trip, text: str, session: Session) -> str:
-    """Free text with no source_url: code proposes candidate diet/budget
-    values (regex, never Jev — see preference_extraction.py), then Jev
-    judges whether the message really asserts each one. Jev is never asked
-    to invent a preference value, only to confirm or reject a candidate."""
-    candidates = preference_extraction.extract_candidates(text)
-    if not candidates:
-        return "Got your message. Intent handling and recommendations are coming in a later update."
+DEFAULT_REPLY = (
+    "Got your message. Share a link to a post and I'll research nearby menus, "
+    "or tell me your diet or budget."
+)
 
+
+async def _handle_preference_message(trip: Trip, text: str, session: Session, timeout: float) -> str:
     try:
-        confirmations = await jev_client.confirm_preference_candidates(text, candidates)
+        reply = await _apply_preference_text(trip, text, session, timeout)
     except JevError:
         raise ApiError(502, "PROVIDER_FAILURE", "Jev is unavailable.", retryable=True)
+    return reply or DEFAULT_REPLY
+
+
+async def _apply_preference_text(
+    trip: Trip, text: str, session: Session, timeout: float, ask: bool = True
+) -> Optional[str]:
+    """Code proposes candidate diet/budget values (regex, never Jev — see
+    preference_extraction.py), then Jev judges whether the message really
+    asserts each one. Jev is never asked to invent a preference value, only
+    to confirm or reject a candidate. Returns None when nothing was proposed
+    or applied; raises JevError when Jev is unavailable. With ask=False an
+    unclear value is reported in the reply instead of becoming the trip's
+    question (a shared link's research sets the trip's status and question)."""
+    candidates = preference_extraction.extract_candidates(text)
+    if not candidates:
+        return None
+
+    try:
+        confirmations = await asyncio.wait_for(jev_client.confirm_preference_candidates(text, candidates), timeout)
+    except asyncio.TimeoutError as exc:
+        raise JevError("Jev preference confirmation timed out.") from exc
 
     accepted: list[str] = []
     unclear: list[str] = []
@@ -163,7 +197,7 @@ async def _handle_preference_message(trip: Trip, text: str, session: Session) ->
                 duration_ms=answer.duration_ms if i == 0 else 0,
             )
         )
-        if answer.choice == "yes" and answer.confidence >= PREFERENCE_MIN_CONFIDENCE:
+        if answer.choice == "yes" and jev_client.supported(answer, PREFERENCE_MIN_CONFIDENCE):
             setattr(trip, field, value)
             accepted.append(f"{field}={value}")
         elif answer.choice != "no":
@@ -174,7 +208,12 @@ async def _handle_preference_message(trip: Trip, text: str, session: Session) ->
     reply_parts = []
     if accepted:
         reply_parts.append(f"Updated your preferences: {', '.join(accepted)}.")
-    if unclear:
+    if unclear and not ask:
+        reply_parts.append(
+            f"I wasn't sure you meant to change your {' or '.join(unclear)}, so I left it as it was; "
+            "tell me directly if you want it updated."
+        )
+    elif unclear:
         trip.status = "needs_clarification"
         trip.clarification = f"Did you mean to update your {' and '.join(unclear)} preference? Please confirm."
         reply_parts.append(trip.clarification)
@@ -182,9 +221,7 @@ async def _handle_preference_message(trip: Trip, text: str, session: Session) ->
         trip.status = "saved"
         trip.clarification = None
 
-    return " ".join(reply_parts) if reply_parts else (
-        "Got your message. Intent handling and recommendations are coming in a later update."
-    )
+    return " ".join(reply_parts) if reply_parts else None
 
 
 @app.post("/score", response_model=ScoreResponse)
@@ -199,53 +236,12 @@ async def score_restaurant(payload: ScoreRequest) -> ScoreResponse:
         raise ApiError(exc.status, exc.code, exc.message, exc.retryable)
     fetch_ms = int((time.monotonic() - fetch_start) * 1000)
 
-    dishes = fetch_result.get("dishes") or []
-    if not dishes:
-        raise ApiError(422, "NO_MENU_EVIDENCE", "No dishes could be extracted from this menu.")
-
-    warnings: list[str] = []
-    if len(dishes) > MAX_DISHES_PER_SCORE:
-        dishes = dishes[:MAX_DISHES_PER_SCORE]
-        warnings.append(f"Only the first {MAX_DISHES_PER_SCORE} dishes were scored.")
-
     try:
-        verdicts = await jev_client.score_dishes(diet=payload.diet, dishes=dishes)
+        return await scoring.score_fetched_menu(payload.restaurant, payload.diet, fetch_result, fetch_ms)
+    except scoring.NoMenuEvidence as exc:
+        raise ApiError(422, "NO_MENU_EVIDENCE", str(exc))
     except JevError:
         raise ApiError(502, "PROVIDER_FAILURE", "Jev is unavailable.", retryable=True)
-
-    dish_outs = [
-        ScoredDishOut(
-            name=dish["name"],
-            verdict=verdict.choice,
-            confidence=verdict.confidence,
-            source="menu",
-            jev_ms=verdict.duration_ms,
-            evidence_ids=dish.get("evidence_ids") or [],
-        )
-        for dish, verdict in zip(dishes, verdicts)
-    ]
-
-    yes_min_confidence = float(os.environ.get("YES_MIN_CONFIDENCE", "0.8"))
-    qualifying = sum(1 for d in dish_outs if d.verdict == "yes" and d.confidence >= yes_min_confidence)
-    score = qualifying / len(dish_outs)
-    confidence = sum(d.confidence for d in dish_outs) / len(dish_outs)
-
-    return ScoreResponse(
-        restaurant=fetch_result.get("restaurant") or payload.restaurant,
-        diet=payload.diet,
-        score=score,
-        confidence=confidence,
-        # No evidence-escalation adapter (reviews/diet-site fetch) exists yet
-        # in backend/menu_fetch, so this slice never escalates — that's an
-        # honest scope limit, not a decision this code is faking on Jev's behalf.
-        escalated=False,
-        before_escalation=None,
-        dishes=dish_outs,
-        timing_ms={"fetch": fetch_ms, "jev_total": sum(v.duration_ms for v in verdicts[:1])},
-        jev_cost_usd=None,  # no verified per-token pricing to convert honestly; never invent one
-        evidence=[EvidenceOut(**e) for e in fetch_result.get("evidence") or []],
-        warnings=warnings,
-    )
 
 
 @app.post("/trips", response_model=CreateTripResponse, status_code=201)
@@ -318,19 +314,23 @@ async def post_message(
                 TripMessage.role == "assistant",
             )
         ).first()
+        # No reply yet means the first delivery is still researching; never
+        # rerun paid research for a duplicate.
         return PostMessageResponse(
-            trip=_serialize_trip(trip, session), reply=existing_reply.text if existing_reply else ""
+            trip=_serialize_trip(trip, session),
+            reply=existing_reply.text if existing_reply else "Still working on that message; check back shortly.",
         )
 
+    candidate = None
     if payload.selected_candidate_id:
-        # No candidates exist until the scoring/research slice lands; any
-        # selection today is by definition unknown.
-        raise ApiError(
-            422,
-            "UNKNOWN_CANDIDATE",
-            "selected_candidate_id does not match a researched candidate on this trip.",
-            trip_id=trip_id,
-        )
+        candidate = session.get(ResearchCandidate, payload.selected_candidate_id)
+        if candidate is None or candidate.trip_id != trip_id:
+            raise ApiError(
+                422,
+                "UNKNOWN_CANDIDATE",
+                "selected_candidate_id does not match a researched candidate on this trip.",
+                trip_id=trip_id,
+            )
 
     session.add(
         TripMessage(
@@ -343,19 +343,16 @@ async def post_message(
         )
     )
 
-    if source_url:
-        # A link is an unambiguous save — no intent classification needed.
-        # Plain free text is not turned into a SavedPost here: telling "save
-        # this place" apart from "make this vegan" is Jev's intent stage
-        # (docs/architecture.md), not a heuristic this slice should guess at.
-        session.add(SavedPost(trip_id=trip_id, source_url=source_url, note=text))
-        # Trip research is not wired yet; don't promise it. Scoring is available via POST /score.
-        reply_text = "Saved to your trip. Automatic menu research for saved places isn't available yet."
+    if candidate is not None:
+        # An explicit human choice; Jev never overrides it.
+        trip.selected_candidate_id = candidate.id
+        reply_text = f"Saved your choice: {candidate.restaurant}."
+    elif source_url:
+        reply_text = await _handle_shared_link(trip, text, source_url, payload.client_message_id, session)
     else:
-        reply_text = await _handle_preference_message(trip, text, session)
+        reply_text = await _handle_text(trip, text, payload.client_message_id, session)
 
     session.add(trip)
-
     session.add(
         TripMessage(
             trip_id=trip_id,
@@ -367,3 +364,130 @@ async def post_message(
     session.commit()
 
     return PostMessageResponse(trip=_serialize_trip(trip, session), reply=reply_text)
+
+
+def _commit_user_message(session: Session, trip_id: str, client_message_id: str) -> None:
+    """Persist the user's input before paid work, so a duplicate delivery
+    sees it and does not start a second research run."""
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise ApiError(
+            409, "DUPLICATE_IN_PROGRESS", "This message is already being processed.", retryable=True, trip_id=trip_id
+        )
+
+
+def _release_user_message(session: Session, trip_id: str, client_message_id: str) -> None:
+    """Undo _commit_user_message when the message fails without a reply, so
+    its retry is handled instead of being told it is still in progress."""
+    session.rollback()
+    message = session.exec(
+        select(TripMessage).where(
+            TripMessage.trip_id == trip_id,
+            TripMessage.client_message_id == client_message_id,
+            TripMessage.role == "user",
+        )
+    ).first()
+    if message is not None:
+        session.delete(message)
+        session.commit()
+
+
+async def _handle_shared_link(trip: Trip, text: str, source_url: str, client_message_id: str, session: Session) -> str:
+    save = SavedPost(trip_id=trip.id, source_url=source_url, note=text)
+    session.add(save)
+    _commit_user_message(session, trip.id, client_message_id)
+    budget = research.Budget(research.budget_seconds())  # the whole request, not just research
+
+    preference_reply = None
+    if text:
+        try:
+            preference_reply = await _apply_preference_text(
+                trip, text, session, budget.step(PREFERENCE_JEV_TIMEOUT_SECONDS), ask=False
+            )
+        except JevError:
+            # Recorded like a research failure: it retires earlier waiting
+            # questions, and a newer link keeps the trip's status.
+            return research.link_failed(
+                session, trip, save,
+                "I saved the link, but Jev (our decision service) was unavailable, so I couldn't research it. "
+                "Share it again to retry.",
+            )
+        if _newer_link_saved(session, save):
+            # The preference still applies, but the newer link owns the trip's
+            # status and question; drop this request's unsaved changes to them.
+            session.expire(trip, ["status", "clarification"])
+    reply = await research.research_shared_link(session, trip, save, budget)
+    return f"{preference_reply} {reply}" if preference_reply else reply
+
+
+def _newer_link_saved(session: Session, save: SavedPost) -> bool:
+    # No autoflush: this request's unsaved trip changes must not reach the
+    # database before the caller decides whether to keep them.
+    with session.no_autoflush:
+        return session.exec(
+            select(SavedPost).where(SavedPost.trip_id == save.trip_id, SavedPost.created_at > save.created_at)
+        ).first() is not None
+
+
+async def _converse(
+    trip: Trip,
+    text: str,
+    session: Session,
+    run: Optional[ResearchRun],
+    candidates: list[ResearchCandidate],
+    preference_timeout: float,
+) -> str:
+    if not candidates:
+        return await _handle_preference_message(trip, text, session, preference_timeout)
+    intent = await conversation.classify(session, trip, text, run, candidates)
+    if intent == "recall":
+        return await conversation.recall(session, trip, text, run, candidates)
+    if intent == "alternative":
+        return await conversation.alternative(session, trip, text, run, candidates)
+    if intent == "update_preferences":
+        return await _handle_preference_message(trip, text, session, preference_timeout)
+    if intent == "unclear":
+        return (
+            "I'm not sure what you'd like. You can ask what I found, ask for a different restaurant, "
+            "or tell me a diet or budget."
+        )
+    return (
+        "I can tell you about the restaurants I researched, suggest another one, update your diet "
+        "or budget, or research a new post if you share its link."
+    )
+
+
+async def _handle_text(trip: Trip, text: str, client_message_id: str, session: Session) -> str:
+    _commit_user_message(session, trip.id, client_message_id)
+    budget = research.Budget(research.budget_seconds())  # the whole request, not just research
+    preference_timeout = budget.step(PREFERENCE_JEV_TIMEOUT_SECONDS)
+    diet_before, clarification_before = trip.diet, trip.clarification
+    waiting = research.waiting_run(session, trip.id)
+    run, candidates = research.latest_candidates(session, trip.id)
+    try:
+        reply = None
+        if waiting is not None and waiting.status == "needs_place":
+            # The trip asked which place; a message naming one answers it.
+            reply = await research.answer_place(session, trip, waiting, text, budget)
+        if reply is None:
+            reply = await _converse(trip, text, session, run, candidates, preference_timeout)
+    except Exception as exc:
+        _release_user_message(session, trip.id, client_message_id)
+        if isinstance(exc, JevError):
+            raise ApiError(502, "PROVIDER_FAILURE", "Jev is unavailable.", retryable=True, trip_id=trip.id) from exc
+        raise
+
+    if waiting is None or waiting.status not in ("needs_place", "needs_diet"):
+        return reply
+    # A place identified earlier may have been waiting only for a diet, and
+    # only the message that supplies it resumes that research.
+    if waiting.status == "needs_diet" and trip.diet and not diet_before:
+        return f"{reply} {await research.research_place(session, trip, waiting, budget)}"
+    # A preference update cleared the trip's question, but the run still needs its answer.
+    if clarification_before and trip.clarification is None:
+        trip.status = "needs_clarification"
+        trip.clarification = research.pending_question(waiting)
+        reply = f"{reply} {trip.clarification}"
+    return reply
