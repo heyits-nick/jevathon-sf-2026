@@ -7,11 +7,21 @@ import type { Message } from "@/lib/api/types";
 export function Conversation({ messages }: { messages: Message[] }) {
   const list = useRef<HTMLOListElement>(null);
   const last = messages.at(-1)?.id;
+  const lastRole = messages.at(-1)?.role;
+  const nearBottom = useRef(true);
 
+  // Follow new messages only if the reader is at the bottom (or just sent one),
+  // so scrolling up to older messages is not interrupted.
   useEffect(() => {
     const el = list.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el && (nearBottom.current || lastRole === "user")) el.scrollTop = el.scrollHeight;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [last]);
+
+  function trackScroll() {
+    const el = list.current;
+    if (el) nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+  }
 
   // The live region stays mounted while empty so the first reply is announced.
   return (
@@ -19,7 +29,7 @@ export function Conversation({ messages }: { messages: Message[] }) {
       {messages.length === 0 && (
         <p className="text-sm text-muted-foreground">No messages yet. Share a post link or ask a question below.</p>
       )}
-      <ol ref={list} className="-mx-1 flex max-h-[26rem] flex-col gap-2 overflow-y-auto px-1" aria-live="polite" aria-label="Conversation">
+      <ol ref={list} onScroll={trackScroll} className="-mx-1 flex max-h-[26rem] flex-col gap-2 overflow-y-auto px-1" aria-live="polite" aria-label="Conversation">
       {messages.map((m) => (
         <li key={m.id} className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}>
           <p

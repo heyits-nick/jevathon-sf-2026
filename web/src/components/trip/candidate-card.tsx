@@ -134,6 +134,8 @@ export function CandidateCard({
           <ScoreFigure result={result} size="sm" />
         </div>
         <VerdictBar result={result} />
+        {/* The expanded details repeat these; collapsed, they stay beside the choice. */}
+        {!expanded && result.warnings?.length ? <ScoreWarnings warnings={result.warnings} /> : null}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
           {links}
           {chooseButton}
