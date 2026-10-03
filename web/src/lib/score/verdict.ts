@@ -32,7 +32,7 @@ export const TONE_TEXT: Record<VerdictTone, string> = {
 
 export const TONE_BG: Record<VerdictTone, string> = {
   success: "bg-success",
-  warning: "bg-warning",
+  warning: "bg-brand",
   danger: "bg-destructive",
 };
 

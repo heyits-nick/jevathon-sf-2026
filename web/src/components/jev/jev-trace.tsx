@@ -1,29 +1,11 @@
 "use client";
 
-import { Archivo, Fragment_Mono, Literata } from "next/font/google";
 import { MotionConfig } from "motion/react";
 import { formatMs, formatUsd } from "@/lib/format";
 import { confidenceTone, stageCopy } from "@/lib/jev/stages";
 import { resolveChoiceLabel } from "@/lib/trip/evidence";
 import type { Candidate, DecisionTrace as Decision, Evidence } from "@/lib/api/types";
 import { JevTicket } from "./jev-ticket";
-
-const display = Archivo({
-  subsets: ["latin"],
-  weight: ["600", "700", "800"],
-  variable: "--font-trace-display",
-});
-
-const body = Literata({
-  subsets: ["latin"],
-  variable: "--font-trace-body",
-});
-
-const numerals = Fragment_Mono({
-  subsets: ["latin"],
-  weight: "400",
-  variable: "--font-trace-num",
-});
 
 interface JevTraceProps {
   decisions: Decision[];
@@ -41,7 +23,7 @@ export function JevTrace({
   costUsd,
   defaultOpen = true,
 }: JevTraceProps) {
-  const fonts = `${display.variable} ${body.variable} ${numerals.variable} jev-trace`;
+  const fonts = "jev-trace";
 
   if (decisions.length === 0) {
     return (

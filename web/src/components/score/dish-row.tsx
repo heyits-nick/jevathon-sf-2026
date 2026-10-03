@@ -10,9 +10,9 @@ export function DishRow({ dish }: { dish: Dish }) {
   const usedReviews = dish.source === "menu+reviews";
 
   return (
-    <li className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 py-3 sm:grid-cols-[1fr_8rem_9rem]">
+    <li className="grid grid-cols-[1fr_auto] items-center gap-x-5 gap-y-2 py-3.5 sm:grid-cols-[1fr_10rem_8.5rem]">
       <div className="flex min-w-0 items-center gap-2">
-        <span className="truncate font-medium">{dish.name}</span>
+        <span className="truncate text-[0.95rem] font-medium">{dish.name}</span>
         {usedReviews && (
           <Tooltip>
             <TooltipTrigger render={<span className="shrink-0 text-muted-foreground" />}>

@@ -18,7 +18,9 @@ export function CandidateList({ trip, selection, busy, onChoose, onRetry }: Cand
 
   if (trip.candidates.length === 0) {
     return trip.status === "ready" ? (
-      <p className="text-sm text-muted-foreground">Research finished without any candidate restaurants.</p>
+      <p className="rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">
+        Research finished without any candidate restaurants.
+      </p>
     ) : null;
   }
 
@@ -37,16 +39,20 @@ export function CandidateList({ trip, selection, busy, onChoose, onRetry }: Cand
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       {recommended.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-lg font-semibold tracking-tight">Recommended</h2>
+        <section className="space-y-4" aria-labelledby="recommended-heading">
+          <h2 id="recommended-heading" className="font-display text-2xl font-bold tracking-tight">
+            Jev&rsquo;s pick
+          </h2>
           {recommended.map((c, i) => card(c, i + 1))}
         </section>
       )}
       {others.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-lg font-semibold tracking-tight">Other places researched</h2>
+        <section className="space-y-4" aria-labelledby="others-heading">
+          <h2 id="others-heading" className="font-display text-2xl font-bold tracking-tight">
+            {recommended.length > 0 ? "Also researched" : "Places researched"}
+          </h2>
           {others.map((c) => card(c))}
         </section>
       )}

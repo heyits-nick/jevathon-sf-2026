@@ -9,7 +9,10 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-display);
+  --font-display: var(--font-display);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -51,76 +54,81 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  /* Warm paper ground, ink text, saffron brand accent. */
+  --background: oklch(0.967 0.008 90);
+  --foreground: oklch(0.21 0.006 85);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.21 0.006 85);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --success: oklch(0.6 0.15 150);
-  --warning: oklch(0.7 0.16 70);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --popover-foreground: oklch(0.21 0.006 85);
+  --primary: oklch(0.21 0.006 85);
+  --primary-foreground: oklch(0.985 0.005 90);
+  --secondary: oklch(0.94 0.01 85);
+  --secondary-foreground: oklch(0.21 0.006 85);
+  --muted: oklch(0.948 0.01 85);
+  --muted-foreground: oklch(0.46 0.013 80);
+  --accent: oklch(0.948 0.01 85);
+  --accent-foreground: oklch(0.21 0.006 85);
+  --brand: oklch(0.8 0.13 80);
+  --brand-foreground: oklch(0.21 0.006 85);
+  --destructive: oklch(0.52 0.19 27);
+  --success: oklch(0.5 0.11 155);
+  --warning: oklch(0.55 0.12 65);
+  --border: oklch(0.9 0.013 85);
+  --input: oklch(0.86 0.017 85);
+  --ring: oklch(0.55 0.12 70);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --radius: 0.75rem;
+  --sidebar: oklch(0.985 0.005 90);
+  --sidebar-foreground: oklch(0.21 0.006 85);
+  --sidebar-primary: oklch(0.21 0.006 85);
+  --sidebar-primary-foreground: oklch(0.985 0.005 90);
+  --sidebar-accent: oklch(0.948 0.01 85);
+  --sidebar-accent-foreground: oklch(0.21 0.006 85);
+  --sidebar-border: oklch(0.9 0.013 85);
+  --sidebar-ring: oklch(0.8 0.13 80);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --success: oklch(0.72 0.15 150);
-  --warning: oklch(0.8 0.15 75);
+  --background: oklch(0.19 0.008 80);
+  --foreground: oklch(0.94 0.012 85);
+  --card: oklch(0.23 0.009 80);
+  --card-foreground: oklch(0.94 0.012 85);
+  --popover: oklch(0.23 0.009 80);
+  --popover-foreground: oklch(0.94 0.012 85);
+  --primary: oklch(0.94 0.012 85);
+  --primary-foreground: oklch(0.21 0.006 85);
+  --secondary: oklch(0.28 0.01 80);
+  --secondary-foreground: oklch(0.94 0.012 85);
+  --muted: oklch(0.28 0.01 80);
+  --muted-foreground: oklch(0.74 0.02 85);
+  --accent: oklch(0.28 0.01 80);
+  --accent-foreground: oklch(0.94 0.012 85);
+  --brand: oklch(0.8 0.13 80);
+  --brand-foreground: oklch(0.21 0.006 85);
+  --destructive: oklch(0.7 0.17 25);
+  --success: oklch(0.76 0.12 150);
+  --warning: oklch(0.8 0.13 75);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: oklch(0.8 0.13 80);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar: oklch(0.23 0.009 80);
+  --sidebar-foreground: oklch(0.94 0.012 85);
+  --sidebar-primary: oklch(0.8 0.13 80);
+  --sidebar-primary-foreground: oklch(0.21 0.006 85);
+  --sidebar-accent: oklch(0.28 0.01 80);
+  --sidebar-accent-foreground: oklch(0.94 0.012 85);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: oklch(0.8 0.13 80);
 }
 
 @layer base {
@@ -137,29 +145,33 @@
 
 /* Jev inspection window — kitchen-ticket rail, scoped to .jev-trace */
 .jev-trace {
-  --trace-ink: oklch(0.93 0.02 85);
-  --trace-muted: oklch(0.78 0.03 85);
-  --trace-paper: oklch(0.22 0.02 75);
-  --trace-ticket: oklch(0.27 0.022 75);
-  --trace-line: oklch(0.4 0.03 75);
-  --trace-turmeric: oklch(0.8 0.14 85);
-  --trace-sage: oklch(0.78 0.1 145);
+  --trace-ink: oklch(0.93 0.015 85);
+  --trace-muted: oklch(0.76 0.02 85);
+  --trace-paper: oklch(0.22 0.008 80);
+  --trace-ticket: oklch(0.27 0.009 80);
+  --trace-line: oklch(0.36 0.012 80);
+  --trace-turmeric: oklch(0.8 0.13 80);
+  --trace-sage: oklch(0.8 0.09 145);
   --trace-alert: oklch(0.72 0.14 25);
+  --font-trace-display: var(--font-display);
+  --font-trace-body: var(--font-sans);
+  --font-trace-num: var(--font-geist-mono);
   color: var(--trace-ink);
-  font-family: var(--font-trace-body), ui-serif, Georgia, serif;
+  font-family: var(--font-trace-body), ui-sans-serif, system-ui, sans-serif;
 }
 
 .jev-trace-shell {
   overflow: hidden;
-  border-radius: 2px;
+  border-radius: 1.25rem;
   background: var(--trace-paper);
+  box-shadow: 0 24px 48px -28px oklch(0.21 0.006 85 / 45%);
 }
 
 .jev-trace-summary {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 0.15rem 1rem;
-  padding: 1.1rem 1.15rem 1rem;
+  padding: 1.35rem 1.4rem 1.1rem;
   cursor: pointer;
   list-style: none;
 }
@@ -181,9 +193,9 @@
 .jev-trace-title {
   grid-column: 1;
   font-family: var(--font-trace-display), ui-sans-serif, sans-serif;
-  font-size: 1.35rem;
+  font-size: 1.5rem;
   font-weight: 800;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.025em;
   line-height: 1.1;
 }
 
@@ -198,21 +210,28 @@
 
 .jev-trace-body {
   display: grid;
-  gap: 1.25rem;
-  padding: 0 1.15rem 1.35rem;
+  gap: 1.1rem;
+  padding: 0 1.4rem 1.4rem;
 }
 
 .jev-trace-lede {
   max-width: 42rem;
-  font-size: 0.92rem;
-  line-height: 1.45;
+  font-size: 0.85rem;
+  line-height: 1.5;
   color: var(--trace-muted);
 }
 
 .jev-trace-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.jev-trace-stats > div {
+  min-width: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.75rem;
+  background: var(--trace-ticket);
 }
 
 .jev-trace-stats dt {
@@ -226,8 +245,11 @@
 
 .jev-trace-stats dd {
   margin-top: 0.2rem;
+  overflow: hidden;
   font-family: var(--font-trace-num), ui-monospace, monospace;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .jev-trace-rail {
@@ -237,15 +259,15 @@
 
 .jev-ticket {
   display: grid;
-  grid-template-columns: 3.1rem 1fr;
-  gap: 0.75rem;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  gap: 0.6rem;
 }
 
 .jev-ticket-index {
   font-family: var(--font-trace-display), ui-sans-serif, sans-serif;
-  font-size: 1.35rem;
-  font-weight: 800;
-  letter-spacing: -0.04em;
+  padding-top: 0.9rem;
+  font-family: var(--font-trace-num), ui-monospace, monospace;
+  font-size: 0.75rem;
   line-height: 1;
   color: var(--trace-turmeric);
 }
@@ -255,6 +277,7 @@
   display: grid;
   gap: 0.45rem;
   padding: 0.85rem 1rem 0.95rem;
+  border-radius: 0.9rem;
   background: var(--trace-ticket);
 }
 
@@ -282,17 +305,17 @@
 
 .jev-ticket-question {
   max-width: 38rem;
-  font-size: 0.92rem;
-  line-height: 1.35;
+  font-size: 0.85rem;
+  line-height: 1.4;
   color: var(--trace-muted);
 }
 
 .jev-ticket-choice {
   font-family: var(--font-trace-display), ui-sans-serif, sans-serif;
-  font-size: 1.2rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
   text-transform: capitalize;
 }
 
@@ -300,8 +323,9 @@
   justify-self: start;
   display: grid;
   min-width: 5.4rem;
-  padding: 0.35rem 0.5rem 0.4rem;
+  padding: 0.35rem 0.55rem 0.4rem;
   border: 1px solid currentColor;
+  border-radius: 0.5rem;
 }
 
 .jev-ticket-stamp span:first-child {
@@ -330,7 +354,7 @@
 
 .jev-alts li {
   display: grid;
-  grid-template-columns: 7.5rem 1fr 2.4rem;
+  grid-template-columns: minmax(0, 6.5rem) 1fr 2.4rem;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.75rem;
@@ -339,7 +363,9 @@
 }
 
 .jev-alt-track {
-  height: 3px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
   background: var(--trace-line);
 }
 
@@ -377,8 +403,8 @@
 
 .jev-quotes blockquote {
   margin-top: 0.15rem;
-  font-size: 0.88rem;
-  line-height: 1.4;
+  font-size: 0.85rem;
+  line-height: 1.45;
 }
 
 .jev-missing {
@@ -387,8 +413,7 @@
 }
 
 @media (max-width: 640px) {
-  .jev-trace-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .jev-ticket { grid-template-columns: 2.2rem 1fr; }
+  .jev-ticket { grid-template-columns: 1.6rem minmax(0, 1fr); }
   .jev-alts li { grid-template-columns: 1fr auto; }
   .jev-alt-track { grid-column: 1 / -1; }
 }
